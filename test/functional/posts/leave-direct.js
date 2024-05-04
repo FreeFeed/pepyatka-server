@@ -172,7 +172,7 @@ describe('POST /v2/posts/:postId/leave', () => {
 
       before(async () => {
         const app = await getSingleton();
-        port = process.env.PEPYATKA_SERVER_PORT || app.context.config.port;
+        ({ port } = app.context);
         const pubsubAdapter = new PubSubAdapter($database);
         PubSub.setPublisher(pubsubAdapter);
       });

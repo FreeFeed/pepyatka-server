@@ -38,7 +38,7 @@ class FreefeedApp extends Application<DefaultState, AppContext> {
     }
 
     this.context.config = config;
-    this.context.port = process.env.PORT ? parseInt(process.env.PORT) : config.port;
+    this.context.port = 0; // to be configured on listen
 
     this.use(asyncContextMiddleware);
 

@@ -41,8 +41,10 @@ export async function getSingleton() {
 
     _app.context.pubsub = new PubsubListener(server, _app);
 
-    const port = process.env.PEPYATKA_SERVER_PORT || process.env.PORT || _app.context.config.port;
+    const port = getListeningPort(_app);
     await listen(port);
+    // The actual port
+    _app.context.port = server.address().port;
 
     const log = createDebug('freefeed:init');
 
@@ -55,4 +57,26 @@ export async function getSingleton() {
   } finally {
     lock.release();
   }
+}
+
+function getListeningPort(_app) {
+  let port = validPortValue(process.env.PEPYATKA_SERVER_PORT);
+
+  if (port === undefined) {
+    port = validPortValue(process.env.PORT);
+  }
+
+  if (port === undefined) {
+    port = validPortValue(_app.context.config.port);
+  }
+
+  return port ?? 0;
+}
+
+function validPortValue(port) {
+  if (typeof port === 'number' && port >= 0 && port < 65536) {
+    return port;
+  }
+
+  return undefined;
 }

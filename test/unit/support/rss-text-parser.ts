@@ -1,4 +1,5 @@
 /* eslint-env node, mocha */
+import config from 'config';
 import expect from 'unexpected';
 
 import { extractTitle, textToHTML } from '../../../app/support/rss-text-parser';
@@ -50,10 +51,10 @@ describe('textToHTML function', () => {
       In the forests of the night,<br>
       What immortal.com hand or eye
       Dare frame thy fearful #symmetry?`;
-    const expected = `<p>Tiger, <a href="http://localhost:31337/tiger">@tiger</a>, burning bright<br />
+    const expected = `<p>Tiger, <a href="${config.host}/tiger">@tiger</a>, burning bright<br />
 In the forests of the night,&lt;br&gt;<br />
 What <a href="https://immortal.com/">immortal.com</a> hand or eye<br />
-Dare frame thy fearful <a href="http://localhost:31337/search?qs=%23symmetry">#symmetry</a>?</p>`;
+Dare frame thy fearful <a href="${config.host}/search?qs=%23symmetry">#symmetry</a>?</p>`;
     expect(textToHTML(input), 'to be', expected);
   });
 });
