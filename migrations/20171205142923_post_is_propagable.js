@@ -10,7 +10,7 @@ export async function up(knex) {
     // Trigger function to update 'is_propagable' flag
     .raw(
       `
-     CREATE OR REPLACE FUNCTION public.trgfun_set_post_is_propagable_on_insert_update()
+     CREATE OR REPLACE FUNCTION trgfun_set_post_is_propagable_on_insert_update()
        RETURNS trigger AS
      $BODY$
      -- Set 'is_propagable' post flag on insert or update.
@@ -36,9 +36,9 @@ export async function up(knex) {
     .raw(
       `CREATE TRIGGER trg_set_post_is_propagable_on_insert_update
     BEFORE INSERT OR UPDATE OF destination_feed_ids
-    ON public.posts
+    ON posts
     FOR EACH ROW
-    EXECUTE PROCEDURE public.trgfun_set_post_is_propagable_on_insert_update();`,
+    EXECUTE PROCEDURE trgfun_set_post_is_propagable_on_insert_update();`,
     )
     // Data migration
     .raw(

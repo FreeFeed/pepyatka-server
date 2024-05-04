@@ -1,18 +1,27 @@
+const { getDbSchemaName } = require('../app/support/parallel-testing');
+
 exports.up = function (knex) {
+  const schemaName = getDbSchemaName();
+  const isPublicSchema = !schemaName || schemaName === 'public';
+
   return Promise.all([
-    knex.raw('SET statement_timeout = 0'),
-    knex.raw('SET lock_timeout = 0'),
-    knex.raw("SET client_encoding = 'UTF8'"),
-    knex.raw('SET standard_conforming_strings = on'),
-    knex.raw('SET check_function_bodies = false'),
-    knex.raw('SET client_min_messages = warning'),
-    knex.raw('SET row_security = off'),
-    knex.raw('CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog'),
-    knex.raw('CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public'),
-    knex.raw('CREATE EXTENSION IF NOT EXISTS intarray WITH SCHEMA public'),
-    knex.raw('SET search_path = public, pg_catalog'),
-    knex.raw("SET default_tablespace = ''"),
-    knex.raw('SET default_with_oids = false'),
+    ...(isPublicSchema
+      ? [
+          knex.raw('SET statement_timeout = 0'),
+          knex.raw('SET lock_timeout = 0'),
+          knex.raw("SET client_encoding = 'UTF8'"),
+          knex.raw('SET standard_conforming_strings = on'),
+          knex.raw('SET check_function_bodies = false'),
+          knex.raw('SET client_min_messages = warning'),
+          knex.raw('SET row_security = off'),
+          knex.raw('CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog'),
+          knex.raw('CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public'),
+          knex.raw('CREATE EXTENSION IF NOT EXISTS intarray WITH SCHEMA public'),
+          knex.raw('SET search_path = public, pg_catalog'),
+          knex.raw("SET default_tablespace = ''"),
+          knex.raw('SET default_with_oids = false'),
+        ]
+      : [knex.raw('SET search_path = :schemaName:, public, pg_catalog', { schemaName })]),
 
     knex.schema.createTable('users', function (table) {
       table.increments().notNullable().primary();
