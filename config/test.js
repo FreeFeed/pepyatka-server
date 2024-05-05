@@ -50,6 +50,8 @@ module.exports = {
 
   registrationsLimit: { maxCount: 10 },
 
+  maintenance: { messageFile: `tmp/MAINTENANCE${getWorkerId()}.txt` },
+
   userPreferences: {
     defaults: {
       // User does't want to view banned comments by default (for compatibility
