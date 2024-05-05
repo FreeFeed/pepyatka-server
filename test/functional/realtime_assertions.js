@@ -1,12 +1,12 @@
 import socketIO from 'socket.io-client';
+import config from 'config';
 
 import { API_VERSION_ACTUAL } from '../../app/api-versions';
 import { getSingleton as initApp } from '../../app/app';
 
 import * as funcTestHelper from './functional_test_helper';
 
-const eventTimeout = 2000;
-const silenceTimeout = 600;
+const { eventTimeout, silenceTimeout } = config.tests.realtime;
 
 class Session {
   socket = null;
