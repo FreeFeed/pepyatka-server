@@ -1016,8 +1016,7 @@ const PromisifiedIO = (host, options, events) => {
 
 export async function createRealtimeConnection(context, callbacks) {
   const app = await initApp();
-
-  const port = process.env.PEPYATKA_SERVER_PORT || app.context.port;
+  const { port } = app.context;
   const options = {
     transports: ['websocket'],
     forceNew: true,

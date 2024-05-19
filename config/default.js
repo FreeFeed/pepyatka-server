@@ -503,4 +503,11 @@ config.translation = {
   apiKey: 'OVERRIDE_IT',
 };
 
+config.tests = {
+  realtime: {
+    eventTimeout: 2000,
+    silenceTimeout: 500,
+  },
+};
+
 module.exports = config;

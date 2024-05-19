@@ -67,4 +67,6 @@ jobs:
         run: yarn lint
 
       - name: run tests
+        env:
+          TEST_THREADS: 4
         run: yarn test

@@ -1,11 +1,10 @@
 import socketIO from 'socket.io-client';
 import socketIOModern from 'socket.io-client-modern';
+import config from 'config';
 
 import { API_VERSION_ACTUAL } from '../../app/api-versions';
 
-const eventTimeout = 2000;
-const silenceTimeout = 500;
-
+const { eventTimeout, silenceTimeout } = config.tests.realtime;
 /**
  * Session is a helper class
  * for the realtime testing

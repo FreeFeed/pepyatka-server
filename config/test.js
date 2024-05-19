@@ -2,9 +2,11 @@ import { resolve } from 'path';
 
 import stubTransport from 'nodemailer-stub-transport';
 
+import { getWorkerId } from '../app/support/parallel-testing';
+
 module.exports = {
-  port: 31337,
-  database: 3,
+  port: 31337 + getWorkerId(),
+  database: 3 + getWorkerId(),
   monitorPrefix: 'tests',
 
   application: { EXTRA_STOP_LIST: ['thatcreepyguy', 'nicegirlnextdoor', 'perfectstranger'] },
@@ -47,6 +49,8 @@ module.exports = {
   ],
 
   registrationsLimit: { maxCount: 10 },
+
+  maintenance: { messageFile: `tmp/MAINTENANCE${getWorkerId()}.txt` },
 
   userPreferences: {
     defaults: {
