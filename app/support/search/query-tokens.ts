@@ -195,7 +195,7 @@ export const listConditions: [RegExp, string][] = [
   [/^liked-?by$/, 'liked-by'],
   [/^to$/, 'to'],
   // Comments
-  // [/^cliked-?by$/, 'cliked-by'],
+  [/^cliked-?by$/, 'cliked-by'],
   // Authorship
   [/^from$/, 'from'],
   [/^authors?$/, 'author'],

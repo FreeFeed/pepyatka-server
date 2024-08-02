@@ -86,10 +86,16 @@ const searchTrait = (superClass) =>
       const allContentAuthors = getAuthorNames(parsedQuery, IN_ALL);
       let postAuthors = getAuthorNames(parsedQuery, IN_POSTS);
       const commentAuthors = getAuthorNames(parsedQuery, IN_COMMENTS);
+      const clikesAuthors = getClikesAuthorNames(parsedQuery);
 
       for (const list of [allContentAuthors, postAuthors, commentAuthors]) {
         list.items = list.items.map((name) => accounts[name] && accounts[name].id).filter(Boolean);
       }
+
+      // Comment likes requires integer ids of users
+      clikesAuthors.items = clikesAuthors.items
+        .map((name) => accounts[name] && accounts[name].intId)
+        .filter(Boolean);
 
       // Posts feeds
       const postsFeedIdsLists = await this._getFeedIdsLists(parsedQuery, accounts);
@@ -152,8 +158,11 @@ const searchTrait = (superClass) =>
         sqlIn('c.user_id', commentAuthors),
       ]);
 
+      // Are we using the 'comment_likes' table?
+      const useClikesTable = !clikesAuthors.isEverything();
       // Are we using the 'comments' table?
-      const useCommentsTable = inAllCommentsSQL !== 'true' || inCommentsSQL !== 'true';
+      const useCommentsTable =
+        inAllCommentsSQL !== 'true' || inCommentsSQL !== 'true' || useClikesTable;
 
       // Additional restrictions for comments
       let commentsRestrictionSQL = 'true';
@@ -163,6 +172,11 @@ const searchTrait = (superClass) =>
         commentsRestrictionSQL = andJoin([
           pgFormat('c.hide_type=%L', Comment.VISIBLE),
           notBannedSQLFabric('c'),
+          useClikesTable &&
+            orJoin([
+              !clikesAuthors.inclusive && 'cl.user_id is null',
+              sqlIn('cl.user_id', clikesAuthors),
+            ]),
         ]);
       }
 
@@ -191,6 +205,7 @@ const searchTrait = (superClass) =>
         `select p.uid, p.${sort}_at as date from posts p `,
         `join users u on p.user_id = u.uid`,
         inCommentsSQL !== 'true' && 'left join comments c on c.post_id = p.uid',
+        useClikesTable && `left join comment_likes cl on cl.comment_id = c.id`,
         `where ${postsPart}`,
       ]
         .filter(Boolean)
@@ -199,7 +214,9 @@ const searchTrait = (superClass) =>
       const fullCommentsSQL =
         useCommentsTable &&
         `select p.uid, p.${sort}_at as date from posts p join users u on p.user_id = u.uid ` +
-          ` join comments c on c.post_id = p.uid where ${commentsPart}`;
+          ` join comments c on c.post_id = p.uid ` +
+          ` ${useClikesTable ? `left join comment_likes cl on cl.comment_id = c.id` : ``} ` +
+          ` where ${commentsPart} `;
 
       const pgVersion = await this.getPGVersion();
 
@@ -226,7 +243,15 @@ const searchTrait = (superClass) =>
     }
 
     async _getAccountsUsedInQuery(parsedQuery, viewerId) {
-      const conditionsWithAccNames = ['in', 'commented-by', 'liked-by', 'from', 'author', 'to'];
+      const conditionsWithAccNames = [
+        'in',
+        'commented-by',
+        'liked-by',
+        'cliked-by',
+        'from',
+        'author',
+        'to',
+      ];
 
       // Map from username to User/Group object (or null)
       const accounts = { me: viewerId && (await this.getFeedOwnerById(viewerId)) };
@@ -395,6 +420,22 @@ function getAuthorNames(tokens, targetScope) {
       token instanceof Condition &&
       ((token.condition === 'from' && targetScope === IN_POSTS) ||
         (token.condition === 'author' && targetScope === currentScope))
+    ) {
+      result = List.intersection(result, token.exclude ? List.inverse(token.args) : token.args);
+    }
+  });
+
+  return result;
+}
+
+function getClikesAuthorNames(tokens) {
+  let result = List.everything();
+
+  walkWithScope(tokens, (token, currentScope) => {
+    if (
+      currentScope === IN_COMMENTS &&
+      token instanceof Condition &&
+      token.condition === 'cliked-by'
     ) {
       result = List.intersection(result, token.exclude ? List.inverse(token.args) : token.args);
     }

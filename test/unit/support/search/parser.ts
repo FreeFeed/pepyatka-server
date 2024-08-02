@@ -145,6 +145,29 @@ describe('search:parseQuery', () => {
         ),
       ],
     },
+    {
+      query: 'foobar cliked-by:john',
+      comment: 'cliked-by: creates a comment scope',
+      result: [
+        new ScopeStart(IN_COMMENTS),
+        seqTexts(new Text(false, false, 'foobar')),
+        new Condition(false, 'cliked-by', ['john']),
+      ],
+    },
+    {
+      query: 'in-comments: foobar cliked-by:john',
+      comment: "cliked-by: doesn't creates additional scope",
+      result: [
+        new ScopeStart(IN_COMMENTS),
+        seqTexts(new Text(false, false, 'foobar')),
+        new Condition(false, 'cliked-by', ['john']),
+      ],
+    },
+    {
+      query: 'in-body: foobar cliked-by:john',
+      comment: "cliked-by: doesn't work in body scope",
+      result: [new ScopeStart(IN_POSTS), seqTexts(new Text(false, false, 'foobar'))],
+    },
   ];
 
   for (const { query, comment, result } of testData) {

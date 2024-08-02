@@ -17,6 +17,7 @@ import {
   Token,
   SeqTexts,
   AnyText,
+  IN_COMMENTS,
 } from './query-tokens';
 
 // -?(scope:)?(double-quoted-string|string)
@@ -53,8 +54,8 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
     const { groups } = match;
 
     if (!groups) {
-      // typescript-hack. can never happen
-      throw new Error();
+      // This should never happen, but TypeScript requires this check
+      return;
     }
 
     if (groups.pipe) {
@@ -154,6 +155,26 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
       ]),
     );
   });
+
+  {
+    // Special case: the 'cliked-by:' operator creates an implicit in-comments:
+    // scope if there is not one defined already.
+    const clikedIdx = tokens.findIndex(
+      (t) => t instanceof Condition && t.condition === 'cliked-by',
+    );
+
+    if (clikedIdx !== -1) {
+      const scopeIdx = tokens.findLastIndex((t, i) => t instanceof ScopeStart && i < clikedIdx);
+
+      if (scopeIdx === -1 || scopeIdx > clikedIdx) {
+        // No scope defined before 'cliked-by:'
+        tokens.unshift(new ScopeStart(IN_COMMENTS));
+      } else if (tokens[scopeIdx] instanceof ScopeStart && tokens[scopeIdx].scope !== IN_COMMENTS) {
+        // Scope defined before 'cliked-by:', but it's not IN_COMMENTS. Ignore 'cliked-by:' in this case.
+        tokens.splice(clikedIdx, 1);
+      }
+    }
+  }
 
   return flow([joinByPipes, joinByPluses])(tokens) as Token[];
 }

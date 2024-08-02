@@ -27,11 +27,12 @@ Some operators takes user name as an arguments. In such operators you can use a 
 * in-body:
 * in-comments:
 * from:
-* author:
+* author: / by:
 * in:
 * in-my:
 * commented-by:
 * liked-by:
+* clicked-by:
 * to:
 
 
@@ -91,9 +92,15 @@ The "in:" operator has the "group:" alias, it left for compatibility.
 
 **to:user1,group2** limits search to posts published in group2 feed or written _to_ user1 as a direct message. This operator acts like **in:** for the groups but also allows to search in direct messages with the specific addressee.
 
+**clicked-by:user1,user2** limits search to comments licked by user1 or user2.
+
+`cat clicked-by:alice` will find all comments liked by Alice with the "cat" word.
+
+Since `clicked-by:` makes sense only for comments, it switches the search scope to comments. So the query `cat clicked-by:alice` is equal to `in-comments: cat clicked-by:alice`. Being used in post body scope (like `in-body: clicked-by:...`), `clicked-by:` is ignored.
+
 ### Content authorship
 
-**author:user1,user2** performs search only in content from user1 or user2.
+**author:user1,user2** performs search only in content from user1 or user2. It has a **by:** alias.
 
 The "content" is defined by the current search scope. By default it is a post and comment bodies: `cat author:alice` will search the "cat" word in all Alice's posts and comments bodies.
 
