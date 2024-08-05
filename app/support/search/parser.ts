@@ -18,7 +18,9 @@ import {
   SeqTexts,
   AnyText,
   IN_COMMENTS,
+  dateConditions,
 } from './query-tokens';
+import { parseDateExpression } from './date-parser';
 
 // -?(scope:)?(double-quoted-string|string)
 const tokenRe = XRegExp(
@@ -135,6 +137,22 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
 
           return;
         }
+      }
+
+      // (-)date:2020-01-01..2020-01-02
+      for (const [re, condition] of dateConditions) {
+        if (!re.test(groups.cond)) {
+          continue;
+        }
+
+        const parsed = parseDateExpression(groups.word);
+
+        if (!parsed) {
+          break;
+        }
+
+        tokens.push(new Condition(!!groups.exclude, condition, parsed));
+        return;
       }
 
       // Scope not found, treat as raw text

@@ -202,6 +202,11 @@ export const listConditions: [RegExp, string][] = [
   [/^by$/, 'author'], // synonym for "author"
 ];
 
+export const dateConditions: [RegExp, string][] = [
+  [/^date$/, 'date'],
+  [/^post-?date$/, 'post-date'],
+];
+
 // A simple trimmer, trims punctuation, separators and some symbols.
 const trimTextRe = XRegExp(`^[\\pP\\pZ\\pC\\pS]*(.*?)[\\pP\\pZ\\pC\\pS]*$`, 'u');
 const trimTextRightRe = XRegExp(`^(.*?)[\\pP\\pZ\\pC\\pS]*$`, 'u');

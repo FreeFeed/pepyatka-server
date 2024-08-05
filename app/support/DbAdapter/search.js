@@ -60,6 +60,14 @@ const searchTrait = (superClass) =>
       let postOnlyAuthors = namesToIds(getAuthorNames(parsedQuery, IN_POSTS), accountsMap);
       const commentOnlyAuthors = namesToIds(getAuthorNames(parsedQuery, IN_COMMENTS), accountsMap);
 
+      // Date
+      const commonDateSQL = orJoin([
+        dateFiltersSQL(parsedQuery, 'p.created_at', IN_ALL),
+        dateFiltersSQL(parsedQuery, 'c.created_at', IN_ALL),
+      ]);
+      const postDateSQL = dateFiltersSQL(parsedQuery, 'p.created_at', IN_POSTS);
+      const commentDateSQL = dateFiltersSQL(parsedQuery, 'c.created_at', IN_COMMENTS);
+
       // Posts elements
 
       // Posts feeds
@@ -99,7 +107,9 @@ const searchTrait = (superClass) =>
         !!commonTextQuery ||
         !commentOnlyAuthors.isEverything() ||
         !commonAuthors.isEverything() ||
-        useCLikesTable;
+        useCLikesTable ||
+        commonDateSQL !== 'true' ||
+        commentDateSQL !== 'true';
 
       // Privacy restrictions for comments
       let commentsRestrictionSQL = 'true';
@@ -131,6 +141,8 @@ const searchTrait = (superClass) =>
         commentOnlyAuthors && sqlIn('c.user_id', commentOnlyAuthors),
       ]);
 
+      const dateSQL = andJoin([commonDateSQL, postDateSQL, commentDateSQL]);
+
       const fullSQL = [
         // Use CTE here for better performance. PostgreSQL optimizer cannot
         // properly optimize conditions like `where feed_ids && '{111}' and
@@ -148,6 +160,7 @@ const searchTrait = (superClass) =>
         andJoin([
           textSQL,
           authorsSQL,
+          dateSQL,
           postsRestrictionsSQL,
           commentsRestrictionSQL,
           useCLikesTable && sqlInOrNull('cl.user_id', cLikesAuthors),
@@ -363,6 +376,22 @@ function getClikesAuthorNames(tokens) {
   });
 
   return result;
+}
+
+function dateFiltersSQL(tokens, field, targetScope) {
+  const result = [];
+  walkWithScope(tokens, (token, currentScope) => {
+    if (
+      token instanceof Condition &&
+      ((token.condition === 'post-date' && targetScope === IN_POSTS) ||
+        (token.condition === 'date' && currentScope === targetScope))
+    ) {
+      result.push(
+        `${field} ${token.exclude ? 'not ' : ''}between '${token.args[0]}' and '${token.args[1]}'`,
+      );
+    }
+  });
+  return andJoin(result);
 }
 
 /**

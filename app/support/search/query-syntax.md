@@ -34,6 +34,8 @@ Some operators takes user name as an arguments. In such operators you can use a 
 * liked-by:
 * clicked-by:
 * to:
+* date:
+* post-date:
 
 
 ### Global search scope
@@ -62,7 +64,7 @@ Local search scope operator are like global ones but without switching the globa
 
 Example: `cat in-body:mouse dog` — the "cat" and "dog" will be searched in post and comments but the "mouse" will be searched only in posts.
 
-### Posts filtering
+### Content filtering
 
 **from:user1,user2** limits search to posts authored by user1 or user2. The `from:alice cat` query will search "cat" in posts authored by Alice _and in any their comments_ (not only in Alice's comments').
 
@@ -97,6 +99,23 @@ The "in:" operator has the "group:" alias, it left for compatibility.
 `cat clicked-by:alice` will find all comments liked by Alice with the "cat" word.
 
 Since `clicked-by:` makes sense only for comments, it switches the search scope to comments. So the query `cat clicked-by:alice` is equal to `in-comments: cat clicked-by:alice`. Being used in post body scope (like `in-body: clicked-by:...`), `clicked-by:` is ignored.
+
+**date:YYYY-MM-DD** and **post-date:YYYY-MM-DD** limits search to content published on the specified date. 
+
+The `date:` operator defines the date of the content being searched. The `foo date:2020-01-01` will search the "foo" word in posts published on 2020-01-01 or in comments published on 2020-01-01 (even if the post date is different).
+
+The `post-date:` always sets the post date. The `in-comments: foo post-date:2020-01-01` will search the "foo" word in comments to posts published on 2020-01-01.
+
+`date:` and `post-date:` are **interval operators**, they are allow you to specify date intervals. Let `D` is a date in the format `YYYY-MM-DD`:
+* `date:D` will search content published on the date `D`
+* `date:=D` is the same as `date:D`
+* `date:<D` will search content published on the date before `D`
+* `date:>D` will search content published on the date after `D`
+* `date:<=D` will search content published on the date before or on `D`
+* `date:>=D` will search content published on the date after or on `D`
+* `date:D1..D2` will search content published on the date between `D1` and `D2` (inclusive)
+* `date:D..*` is the same as `date:>=D`
+* `date:*..D` is the same as `date:<=D`
 
 ### Content authorship
 
