@@ -162,7 +162,7 @@ describe('Search', () => {
           {
             query: 'in-comment:venus -in-body:luna',
             filter: (p) => p.userId !== luna.id,
-            comment: `all posts (by "venus") expect the Luna's (by "luna")`,
+            comment: `all posts (by "venus") except the Luna's (by "luna")`,
           },
         ]);
 

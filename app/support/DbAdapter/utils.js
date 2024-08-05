@@ -40,6 +40,11 @@ export function sqlIn(field, list) {
   return pgFormat(`${field} ${list.inclusive ? 'in' : 'not in'} (%L)`, list.items);
 }
 
+export function sqlInOrNull(field, list) {
+  list = List.from(list);
+  return orJoin([!list.inclusive && `${field} is null`, sqlIn(field, list)]);
+}
+
 export function sqlNotIn(field, list) {
   return sqlIn(field, List.inverse(list));
 }

@@ -12,7 +12,7 @@ By default _all_ text terms in query will be searched (AND is implied). You can 
 
 Two important rules about the `+` and `|` symbols:
 
-1. The `|` symbol has the higest priority: `cat mouse | dog` means 'the documents with "cat" AND ("mouse" OR "dog")'; `cat + mouse | dog` means 'the documents with "cat" FOLLOWED_BY ("mouse" OR "dog")'.
+1. The `|` symbol has the highest priority: `cat mouse | dog` means 'the documents with "cat" AND ("mouse" OR "dog")'; `cat + mouse | dog` means 'the documents with "cat" FOLLOWED_BY ("mouse" OR "dog")'.
 2. The AND symbol has the lowest priority: `cat + mouse dog` means 'the documents with ("cat" FOLLOWED_BY "mouse") AND "dog"'.
 3. You can use the `|` and `+` symbols only between the text terms, not with the other operators.
 
