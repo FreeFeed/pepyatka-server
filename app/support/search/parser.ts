@@ -155,6 +155,17 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
         return;
       }
 
+      // has:images,audio
+      if (groups.cond === 'has') {
+        const validWords = ['image', 'audio', 'file'];
+        const words = (groups.word as string)
+          .split(',')
+          .map((w) => w.replace(/s$/g, ''))
+          .filter((w) => validWords.includes(w));
+        tokens.push(new Condition(!!groups.exclude, 'has', words));
+        return;
+      }
+
       // Scope not found, treat as raw text
       tokens.push(
         new AnyText([new Text(!!groups.exclude, false, trimText(raw, { minPrefixLength }))]),

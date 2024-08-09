@@ -1,4 +1,4 @@
-import { flatten, uniq } from 'lodash';
+import { flatten, union, uniq } from 'lodash';
 import config from 'config';
 import pgFormat from 'pg-format';
 
@@ -15,7 +15,7 @@ import {
 import { List } from '../open-lists';
 import { Comment } from '../../models';
 
-import { sqlIn, sqlIntarrayIn, andJoin, orJoin, sqlInOrNull } from './utils';
+import { sqlIn, sqlIntarrayIn, andJoin, orJoin, sqlInOrNull, sqlNot } from './utils';
 
 /**
  * @typedef {import('../search/query-tokens').Token} Token
@@ -67,6 +67,10 @@ const searchTrait = (superClass) =>
       ]);
       const postDateSQL = dateFiltersSQL(parsedQuery, 'p.created_at', IN_POSTS);
       const commentDateSQL = dateFiltersSQL(parsedQuery, 'c.created_at', IN_COMMENTS);
+
+      // Files
+      const fileTypesSQL = fileTypesFiltersSQL(parsedQuery, 'a');
+      const useFilesTable = fileTypesSQL !== 'true' && fileTypesSQL !== 'false';
 
       // Posts elements
 
@@ -152,10 +156,12 @@ const searchTrait = (superClass) =>
         postsFeedsSQL !== 'true' &&
           `with posts as materialized (select * from posts p where ${postsFeedsSQL})`,
 
-        `select distinct p.uid, p.${sort}_at as date from posts p `,
+        `select p.uid, p.${sort}_at as date`,
+        `from posts p`,
         `join users u on p.user_id = u.uid`,
         useCommentsTable && `left join comments c on c.post_id = p.uid`,
         useCLikesTable && `left join comment_likes cl on cl.comment_id = c.id`,
+        useFilesTable && `left join attachments a on a.post_id = p.uid`,
         `where`,
         andJoin([
           textSQL,
@@ -165,6 +171,8 @@ const searchTrait = (superClass) =>
           commentsRestrictionSQL,
           useCLikesTable && sqlInOrNull('cl.user_id', cLikesAuthors),
         ]),
+        `group by p.uid, p.${sort}_at`,
+        `having ${fileTypesSQL}`,
         `order by date desc limit ${+limit} offset ${+offset}`,
       ]
         .filter(Boolean)
@@ -392,6 +400,64 @@ function dateFiltersSQL(tokens, field, targetScope) {
     }
   });
   return andJoin(result);
+}
+
+const validFileTypes = ['audio', 'image', 'general'];
+/**
+ * Returns aggregated List of file types used in 'has:' conditions. Returns null
+ * if none of such conditions present.
+ *
+ * @param {Token[]} tokens
+ * @returns {[string[]|null, string[]|null]}
+ */
+function getFileTypes(tokens) {
+  /** @type {string[]|null}  */
+  let positive = null;
+  /** @type {string[]|null}  */
+  let negative = null;
+
+  for (const token of tokens) {
+    if (!(token instanceof Condition) || token.condition !== 'has') {
+      continue;
+    }
+
+    // Select only the valid file types
+    const argTypes = token.args
+      // The 'file' type means 'audio, image, or general'
+      .flatMap((a) => (a === 'file' ? validFileTypes : a))
+      .filter((a) => validFileTypes.includes(a));
+
+    if (!token.exclude) {
+      positive = positive ? union(positive, argTypes) : uniq(argTypes);
+    } else {
+      negative = negative ? union(negative, argTypes) : uniq(argTypes);
+    }
+  }
+
+  return [positive, negative];
+}
+
+/**
+ * @param {string[]} types
+ * @param {string} attTable
+ * @returns {string|null}
+ */
+function fileTypesToAggregate(types, attTable) {
+  if (types.length === validFileTypes.length) {
+    // Any type is valid
+    return `bool_or(${attTable}.media_type is not null)`;
+  }
+
+  return `bool_or(${orJoin(types.map((t) => `${attTable}.media_type = '${t}'`))})`;
+}
+
+function fileTypesFiltersSQL(tokens, attTable) {
+  const [positiveTypes, negativeTypes] = getFileTypes(tokens);
+
+  return andJoin([
+    positiveTypes && fileTypesToAggregate(positiveTypes, attTable),
+    negativeTypes && sqlNot(fileTypesToAggregate(negativeTypes, attTable)),
+  ]);
 }
 
 /**

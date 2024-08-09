@@ -36,6 +36,7 @@ Some operators takes user name as an arguments. In such operators you can use a 
 * to:
 * date:
 * post-date:
+* has:
 
 
 ### Global search scope
@@ -116,6 +117,8 @@ The `post-date:` always sets the post date. The `in-comments: foo post-date:2020
 * `date:D1..D2` will search content published on the date between `D1` and `D2` (inclusive)
 * `date:D..*` is the same as `date:>=D`
 * `date:*..D` is the same as `date:<=D`
+
+**has:images,audio** limits search to posts with files of the specified type. You can specify the concrete file type (only `images` or `audio` for now), or search for any files using the `has:files` form.
 
 ### Content authorship
 
