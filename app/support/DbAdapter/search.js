@@ -15,7 +15,7 @@ import {
 import { List } from '../open-lists';
 import { Comment } from '../../models';
 
-import { sqlIn, sqlIntarrayIn, andJoin, orJoin, sqlInOrNull, sqlNot } from './utils';
+import { sqlIn, sqlIntarrayIn, andJoin, orJoin, sqlNot } from './utils';
 
 /**
  * @typedef {import('../search/query-tokens').Token} Token
@@ -101,10 +101,9 @@ const searchTrait = (superClass) =>
       // Comments elements
 
       // CLiked-by
-      const cLikesAuthors = namesToIntIds(getClikesAuthorNames(parsedQuery), accountsMap);
+      const cLikesSQL = getClikesAuthorsSQL(parsedQuery, 'cl.user_id', accountsMap);
+      const useCLikesTable = cLikesSQL !== 'true' && cLikesSQL !== 'false';
 
-      // Are we using the 'comment_likes' table?
-      const useCLikesTable = !cLikesAuthors.isEverything();
       // Are we using the 'comments' table?
       const useCommentsTable =
         !!commentsOnlyTextQuery ||
@@ -163,16 +162,9 @@ const searchTrait = (superClass) =>
         useCLikesTable && `left join comment_likes cl on cl.comment_id = c.id`,
         useFilesTable && `left join attachments a on a.post_id = p.uid`,
         `where`,
-        andJoin([
-          textSQL,
-          authorsSQL,
-          dateSQL,
-          postsRestrictionsSQL,
-          commentsRestrictionSQL,
-          useCLikesTable && sqlInOrNull('cl.user_id', cLikesAuthors),
-        ]),
+        andJoin([textSQL, authorsSQL, dateSQL, postsRestrictionsSQL, commentsRestrictionSQL]),
         `group by p.uid, p.${sort}_at`,
-        `having ${fileTypesSQL}`,
+        `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
         `order by date desc limit ${+limit} offset ${+offset}`,
       ]
         .filter(Boolean)
@@ -370,8 +362,9 @@ function getAuthorNames(tokens, targetScope) {
   return result;
 }
 
-function getClikesAuthorNames(tokens) {
-  let result = List.everything();
+function getClikesAuthorsSQL(tokens, field, accountsMap) {
+  let positive = null;
+  let negative = null;
 
   walkWithScope(tokens, (token, currentScope) => {
     if (
@@ -379,11 +372,25 @@ function getClikesAuthorNames(tokens) {
       token instanceof Condition &&
       token.condition === 'cliked-by'
     ) {
-      result = List.intersection(result, token.exclude ? List.inverse(token.args) : token.args);
+      if (!token.exclude) {
+        positive = positive ? union(positive, token.args) : uniq(token.args);
+      } else {
+        negative = negative ? union(negative, token.args) : uniq(token.args);
+      }
     }
   });
 
-  return result;
+  if (positive) {
+    positive = positive.map((n) => accountsMap[n]?.intId).filter(Boolean);
+  }
+
+  if (negative) {
+    negative = negative.map((n) => accountsMap[n]?.intId).filter(Boolean);
+  }
+
+  const positiveAgg = positive && `bool_or(${orJoin(positive.map((id) => `${field} = ${id}`))})`;
+  const negativeAgg = negative && `bool_or(${orJoin(negative.map((id) => `${field} = ${id}`))})`;
+  return andJoin([positiveAgg && positiveAgg, negativeAgg && sqlNot(negativeAgg)]);
 }
 
 function dateFiltersSQL(tokens, field, targetScope) {
@@ -482,12 +489,5 @@ function orPostsFromMeState(tokens) {
 
 function namesToIds(list, accountsMap) {
   list.items = list.items.map((name) => accountsMap[name] && accountsMap[name].id).filter(Boolean);
-  return list;
-}
-
-function namesToIntIds(list, accountsMap) {
-  list.items = list.items
-    .map((name) => accountsMap[name] && accountsMap[name].intId)
-    .filter(Boolean);
   return list;
 }

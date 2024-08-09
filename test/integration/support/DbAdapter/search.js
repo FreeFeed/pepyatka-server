@@ -703,14 +703,15 @@ describe('Search', () => {
   });
 
   describe('Comment likes (`cliked-by:`)', () => {
-    let luna, mars;
+    let luna, mars, venus;
 
     before(async () => {
       await cleanDB($pg_database);
 
       luna = new User({ username: 'luna', password: 'pw' });
       mars = new User({ username: 'mars', password: 'pw' });
-      await Promise.all([luna.create(), mars.create()]);
+      venus = new User({ username: 'venus', password: 'pw' });
+      await Promise.all([luna.create(), mars.create(), venus.create()]);
 
       const [lunaFeed, marsFeed] = await Promise.all([
         luna.getPostsTimeline(),
@@ -756,16 +757,19 @@ describe('Search', () => {
         if (post.userId === luna.id) {
           await marsComment.addLike(luna); // eslint-disable-line no-await-in-loop
         }
+
+        // Venus likes all Mars comments
+        await marsComment.addLike(venus); // eslint-disable-line no-await-in-loop
       }
     });
     after(() => Promise.all(posts.map((post) => post.destroy())));
 
-    it('should search liked comment', async () => {
+    it('should search comment liked by Luna', async () => {
       const postIds = await dbAdapter.search('mars comment cliked-by:luna');
       expect(postIds, 'to equal', [posts[0].id]);
     });
 
-    it('should search NOT liked comment', async () => {
+    it('should search comment NOT liked by Luna', async () => {
       const postIds = await dbAdapter.search('mars comment -cliked-by:luna');
       expect(postIds, 'to equal', [posts[1].id]);
     });
