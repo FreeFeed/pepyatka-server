@@ -70,14 +70,17 @@ const searchTrait = (superClass) =>
 
       // Files
       const fileTypesSQL = fileTypesFiltersSQL(parsedQuery, 'a');
-      const useFilesTable = fileTypesSQL !== 'true' && fileTypesSQL !== 'false';
+      const useFilesTable = isNonTrivialSQL(fileTypesSQL);
 
       // Counters
       const postCountersSQL = andJoin([
         countersFiltersSQL(parsedQuery, 'comments', 'pc.comments_count'),
         countersFiltersSQL(parsedQuery, 'likes', 'pc.likes_count'),
       ]);
-      const usePostCountersTable = postCountersSQL !== 'true' && postCountersSQL !== 'false';
+      const usePostCountersTable = isNonTrivialSQL(postCountersSQL);
+
+      const commentCountersSQL = countersFiltersSQL(parsedQuery, 'clikes', 'cc.likes_count');
+      const useCommentCountersTable = isNonTrivialSQL(commentCountersSQL);
 
       // Posts elements
 
@@ -109,7 +112,7 @@ const searchTrait = (superClass) =>
 
       // CLiked-by
       const cLikesSQL = getClikesAuthorsSQL(parsedQuery, 'cl.user_id', accountsMap);
-      const useCLikesTable = cLikesSQL !== 'true' && cLikesSQL !== 'false';
+      const useCLikesTable = isNonTrivialSQL(cLikesSQL);
 
       // Are we using the 'comments' table?
       const useCommentsTable =
@@ -118,8 +121,9 @@ const searchTrait = (superClass) =>
         !commentOnlyAuthors.isEverything() ||
         !commonAuthors.isEverything() ||
         useCLikesTable ||
-        commonDateSQL !== 'true' ||
-        commentDateSQL !== 'true';
+        useCommentCountersTable ||
+        isNonTrivialSQL(commonDateSQL) ||
+        isNonTrivialSQL(commentDateSQL);
 
       // Privacy restrictions for comments
       let commentsRestrictionSQL = 'true';
@@ -169,6 +173,7 @@ const searchTrait = (superClass) =>
         useCLikesTable && `left join comment_likes cl on cl.comment_id = c.id`,
         useFilesTable && `left join attachments a on a.post_id = p.uid`,
         usePostCountersTable && `join post_counters pc on pc.post_id = p.uid`,
+        useCommentCountersTable && `join comment_counters cc on cc.comment_id = c.uid`,
         `where`,
         andJoin([
           textSQL,
@@ -177,6 +182,7 @@ const searchTrait = (superClass) =>
           postsRestrictionsSQL,
           commentsRestrictionSQL,
           postCountersSQL,
+          commentCountersSQL,
         ]),
         `group by p.uid, p.${sort}_at`,
         `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
@@ -519,4 +525,8 @@ function orPostsFromMeState(tokens) {
 function namesToIds(list, accountsMap) {
   list.items = list.items.map((name) => accountsMap[name] && accountsMap[name].id).filter(Boolean);
   return list;
+}
+
+function isNonTrivialSQL(sql) {
+  return sql && sql !== 'true' && sql !== 'false';
 }

@@ -37,6 +37,7 @@ Some operators takes user name as an arguments. In such operators you can use a 
 * has:
 * comments: *(interval)*
 * likes: *(interval)*
+* clikes: *(interval)*
 * date: *(interval)*
 * post-date: *(interval)*
 
@@ -121,6 +122,10 @@ Since `clicked-by:` makes sense only for comments, it switches the search scope 
 **comments:*(interval)*** limits search to posts with the specified number of comments.
 
 **likes:*(interval)*** limits search to posts with the specified number of likes.
+
+**clikes:*(interval))*** limits search to comments with the specified number of likes.
+
+Since `clikes:` makes sense only for comments, it switches the search scope to comments. So the query `cat clikes:1` is equal to `in-comments: cat clikes:1`. Being used in post body scope (like `in-body: clikes:...`), `clikes:` is ignored.
 
 **date:*(interval)*** and **post-date:*(interval)*** limits search to content published on the specified date. Dates are in the format `YYYY-MM-DD`.
 

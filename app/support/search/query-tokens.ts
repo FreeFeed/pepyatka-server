@@ -210,6 +210,7 @@ export const dateConditions: [RegExp, string][] = [
 export const counterConditions: [RegExp, string][] = [
   [/^likes?$/, 'likes'],
   [/^comments?$/, 'comments'],
+  [/^clikes?$/, 'clikes'],
 ];
 
 // A simple trimmer, trims punctuation, separators and some symbols.
