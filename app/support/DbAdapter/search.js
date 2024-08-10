@@ -72,6 +72,13 @@ const searchTrait = (superClass) =>
       const fileTypesSQL = fileTypesFiltersSQL(parsedQuery, 'a');
       const useFilesTable = fileTypesSQL !== 'true' && fileTypesSQL !== 'false';
 
+      // Counters
+      const postCountersSQL = andJoin([
+        countersFiltersSQL(parsedQuery, 'comments', 'pc.comments_count'),
+        countersFiltersSQL(parsedQuery, 'likes', 'pc.likes_count'),
+      ]);
+      const usePostCountersTable = postCountersSQL !== 'true' && postCountersSQL !== 'false';
+
       // Posts elements
 
       // Posts feeds
@@ -161,8 +168,16 @@ const searchTrait = (superClass) =>
         useCommentsTable && `left join comments c on c.post_id = p.uid`,
         useCLikesTable && `left join comment_likes cl on cl.comment_id = c.id`,
         useFilesTable && `left join attachments a on a.post_id = p.uid`,
+        usePostCountersTable && `join post_counters pc on pc.post_id = p.uid`,
         `where`,
-        andJoin([textSQL, authorsSQL, dateSQL, postsRestrictionsSQL, commentsRestrictionSQL]),
+        andJoin([
+          textSQL,
+          authorsSQL,
+          dateSQL,
+          postsRestrictionsSQL,
+          commentsRestrictionSQL,
+          postCountersSQL,
+        ]),
         `group by p.uid, p.${sort}_at`,
         `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
         `order by date desc limit ${+limit} offset ${+offset}`,
@@ -406,6 +421,20 @@ function dateFiltersSQL(tokens, field, targetScope) {
       );
     }
   });
+  return andJoin(result);
+}
+
+function countersFiltersSQL(tokens, condition, field) {
+  const result = [];
+
+  for (const token of tokens) {
+    if (token instanceof Condition && token.condition === condition) {
+      result.push(
+        `${field} ${token.exclude ? 'not ' : ''}between '${token.args[0]}' and '${token.args[1]}'`,
+      );
+    }
+  }
+
   return andJoin(result);
 }
 

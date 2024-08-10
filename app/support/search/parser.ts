@@ -19,8 +19,10 @@ import {
   AnyText,
   IN_COMMENTS,
   dateConditions,
+  counterConditions,
 } from './query-tokens';
 import { parseDateExpression } from './date-parser';
+import { parseCounterExpression } from './counter-parser';
 
 // -?(scope:)?(double-quoted-string|string)
 const tokenRe = XRegExp(
@@ -163,6 +165,22 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
           .map((w) => w.replace(/s$/g, ''))
           .filter((w) => validWords.includes(w));
         tokens.push(new Condition(!!groups.exclude, 'has', words));
+        return;
+      }
+
+      // (-)comments:2..12
+      for (const [re, condition] of counterConditions) {
+        if (!re.test(groups.cond)) {
+          continue;
+        }
+
+        const parsed = parseCounterExpression(groups.word);
+
+        if (!parsed) {
+          break;
+        }
+
+        tokens.push(new Condition(!!groups.exclude, condition, parsed));
         return;
       }
 

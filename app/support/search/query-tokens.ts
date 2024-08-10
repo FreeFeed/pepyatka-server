@@ -207,6 +207,11 @@ export const dateConditions: [RegExp, string][] = [
   [/^post-?date$/, 'post-date'],
 ];
 
+export const counterConditions: [RegExp, string][] = [
+  [/^likes?$/, 'likes'],
+  [/^comments?$/, 'comments'],
+];
+
 // A simple trimmer, trims punctuation, separators and some symbols.
 const trimTextRe = XRegExp(`^[\\pP\\pZ\\pC\\pS]*(.*?)[\\pP\\pZ\\pC\\pS]*$`, 'u');
 const trimTextRightRe = XRegExp(`^(.*?)[\\pP\\pZ\\pC\\pS]*$`, 'u');

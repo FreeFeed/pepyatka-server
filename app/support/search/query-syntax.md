@@ -34,9 +34,11 @@ Some operators takes user name as an arguments. In such operators you can use a 
 * liked-by:
 * clicked-by:
 * to:
-* date:
-* post-date:
 * has:
+* comments: *(interval)*
+* likes: *(interval)*
+* date: *(interval)*
+* post-date: *(interval)*
 
 
 ### Global search scope
@@ -54,6 +56,19 @@ Example: `cat in-body: mouse` — the "cat" will be searched in posts and commen
 Example: `in-comments: mouse` — the "mouse" will be searched only in comment bodies.
 
 The global search scope operators switches search scope from itself to the end of the query or to the other global scope operator. 
+
+### Interval operators
+
+Some operators allow to specify the interval of the values. The interval syntax is common for all such operators, see the `comments:` syntax below.
+* `comments:N` means exactly N comments
+* `comments:=N` is the same as `comments:N`
+* `comments:<N` means less than N comments
+* `comments:>N` means more than N comments
+* `comments:<=N` means less than or equal to N comments
+* `comments:>=N` means more than or equal to N comments
+* `comments:N1..N2` means at least N1 and at most N2 comments
+* `comments:N1..*` is the same as `comments:>=N1`
+* `comments:*..N2` is the same as `comments:<=N2`
 
 ### Local search scope
 
@@ -101,24 +116,17 @@ The "in:" operator has the "group:" alias, it left for compatibility.
 
 Since `clicked-by:` makes sense only for comments, it switches the search scope to comments. So the query `cat clicked-by:alice` is equal to `in-comments: cat clicked-by:alice`. Being used in post body scope (like `in-body: clicked-by:...`), `clicked-by:` is ignored.
 
-**date:YYYY-MM-DD** and **post-date:YYYY-MM-DD** limits search to content published on the specified date. 
+**has:images,audio** limits search to posts with files of the specified type. You can specify the concrete file type (only `images` or `audio` for now), or search for any files using the `has:files` form.
+
+**comments:*(interval)*** limits search to posts with the specified number of comments.
+
+**likes:*(interval)*** limits search to posts with the specified number of likes.
+
+**date:*(interval)*** and **post-date:*(interval)*** limits search to content published on the specified date. Dates are in the format `YYYY-MM-DD`.
 
 The `date:` operator defines the date of the content being searched. The `foo date:2020-01-01` will search the "foo" word in posts published on 2020-01-01 or in comments published on 2020-01-01 (even if the post date is different).
 
 The `post-date:` always sets the post date. The `in-comments: foo post-date:2020-01-01` will search the "foo" word in comments to posts published on 2020-01-01.
-
-`date:` and `post-date:` are **interval operators**, they are allow you to specify date intervals. Let `D` is a date in the format `YYYY-MM-DD`:
-* `date:D` will search content published on the date `D`
-* `date:=D` is the same as `date:D`
-* `date:<D` will search content published on the date before `D`
-* `date:>D` will search content published on the date after `D`
-* `date:<=D` will search content published on the date before or on `D`
-* `date:>=D` will search content published on the date after or on `D`
-* `date:D1..D2` will search content published on the date between `D1` and `D2` (inclusive)
-* `date:D..*` is the same as `date:>=D`
-* `date:*..D` is the same as `date:<=D`
-
-**has:images,audio** limits search to posts with files of the specified type. You can specify the concrete file type (only `images` or `audio` for now), or search for any files using the `has:files` form.
 
 ### Content authorship
 
