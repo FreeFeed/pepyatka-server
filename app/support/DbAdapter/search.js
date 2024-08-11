@@ -166,7 +166,7 @@ const searchTrait = (superClass) =>
         postsFeedsSQL !== 'true' &&
           `with posts as materialized (select * from posts p where ${postsFeedsSQL})`,
 
-        `select p.uid, p.${sort}_at as date`,
+        `select p.uid, p.${sort}_at as date, p.id`,
         `from posts p`,
         `join users u on p.user_id = u.uid`,
         useCommentsTable && `left join comments c on c.post_id = p.uid`,
@@ -184,16 +184,16 @@ const searchTrait = (superClass) =>
           postCountersSQL,
           commentCountersSQL,
         ]),
-        `group by p.uid, p.${sort}_at`,
+        `group by p.uid, p.${sort}_at, p.id`,
         `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
-        `order by date desc limit ${+limit} offset ${+offset}`,
+        `order by date desc, p.id desc limit ${+limit} offset ${+offset}`,
       ]
         .filter(Boolean)
         .join('\n');
 
       // console.log(fullSQL);
 
-      return (await this.database.raw(fullSQL)).rows.map((r) => r.uid);
+      return this.database.getCol(fullSQL);
     }
 
     async _getAccountsUsedInQuery(parsedQuery, viewerId) {
