@@ -3,7 +3,8 @@
 import expect from 'unexpected';
 
 import cleanDB from '../../../dbCleaner';
-import { Post, User, dbAdapter } from '../../../../app/models';
+import { User, dbAdapter } from '../../../../app/models';
+import { createPost } from '../../helpers/posts-and-comments';
 
 describe('Search by file types', () => {
   const posts = [];
@@ -14,7 +15,6 @@ describe('Search by file types', () => {
 
     luna = new User({ username: 'luna', password: 'pw' });
     await luna.create();
-    const lunaFeed = await luna.getPostsTimeline();
 
     const imageFileId1 = await dbAdapter.createAttachment({
       fileName: 'image.jpg',
@@ -44,15 +44,9 @@ describe('Search by file types', () => {
     });
 
     for (let i = 0; i < 3; i++) {
-      const post = new Post({
-        body: `post ${i}`,
-        userId: luna.id,
-        timelineIds: [lunaFeed.id],
-      });
-      posts.push(post);
+      // eslint-disable-next-line no-await-in-loop
+      posts[i] = await createPost(luna, `post ${i}`);
     }
-
-    await Promise.all(posts.map((post) => post.create()));
 
     await posts[0].linkAttachments([imageFileId1]);
     await posts[1].linkAttachments([imageFileId2, audioFileId1]);
