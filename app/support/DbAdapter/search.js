@@ -422,9 +422,7 @@ function dateFiltersSQL(tokens, field, targetScope) {
       ((token.condition === 'post-date' && targetScope === IN_POSTS) ||
         (token.condition === 'date' && currentScope === targetScope))
     ) {
-      result.push(
-        `${field} ${token.exclude ? 'not ' : ''}between '${token.args[0]}' and '${token.args[1]}'`,
-      );
+      result.push(intervalSQL(token, field));
     }
   });
   return andJoin(result);
@@ -435,13 +433,25 @@ function countersFiltersSQL(tokens, condition, field) {
 
   for (const token of tokens) {
     if (token instanceof Condition && token.condition === condition) {
-      result.push(
-        `${field} ${token.exclude ? 'not ' : ''}between '${token.args[0]}' and '${token.args[1]}'`,
-      );
+      result.push(intervalSQL(token, field));
     }
   }
 
   return andJoin(result);
+}
+
+function intervalSQL(token, field) {
+  const [start, end] = token.args;
+
+  if (start && end) {
+    return pgFormat(`${field} %s between %L and %L`, token.exclude ? 'not' : '', start, end);
+  } else if (start) {
+    return pgFormat(`${field} %s %L`, token.exclude ? '<' : '>=', start);
+  } else if (end) {
+    return pgFormat(`${field} %s %L`, token.exclude ? '>' : '<=', end);
+  }
+
+  return 'false';
 }
 
 const validFileTypes = ['audio', 'image', 'general'];

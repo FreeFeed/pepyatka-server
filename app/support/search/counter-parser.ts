@@ -1,13 +1,7 @@
-import pgFormat from 'pg-format';
-
-import { Condition } from './query-tokens';
-
 const counterExpressions = [
   /^(?<op>=|>=?|<=?)?(?<value>\d+)$/,
   /^(?<start>\d+|\*)\.\.(?<end>\d+|\*)$/, // "3..10" or "3..*"
 ];
-
-const maxCount = '1000000000'; // 1e9
 
 export function parseCounterExpression(counterExpr: string): [string, string] | null {
   let match = null;
@@ -30,13 +24,13 @@ export function parseCounterExpression(counterExpr: string): [string, string] | 
     const intValue = parseInt(value, 10);
 
     if (op === '>=') {
-      return [intValue.toString(), maxCount];
+      return [intValue.toString(), ''];
     } else if (op === '>') {
-      return [(intValue + 1).toString(), maxCount];
+      return [(intValue + 1).toString(), ''];
     } else if (op === '<=') {
-      return ['0', intValue.toString()];
+      return ['', intValue.toString()];
     } else if (op === '<') {
-      return ['0', (intValue - 1).toString()];
+      return ['', (intValue - 1).toString()];
     }
 
     // op == '=' or is empty
@@ -46,12 +40,8 @@ export function parseCounterExpression(counterExpr: string): [string, string] | 
   if (start && end && (start !== '*' || end !== '*')) {
     const intStart = parseInt(start, 10);
     const intEnd = parseInt(end, 10);
-    return [start === '*' ? '0' : intStart.toString(), end === '*' ? maxCount : intEnd.toString()];
+    return [start === '*' ? '' : intStart.toString(), end === '*' ? '' : intEnd.toString()];
   }
 
   return null;
-}
-
-export function counterConditionSQL(cond: Condition): string {
-  return pgFormat(`${cond.exclude ? 'not ' : ''}between %L and %L`, cond.args[0], cond.args[1]);
 }

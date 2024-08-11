@@ -1,7 +1,3 @@
-import pgFormat from 'pg-format';
-
-import { Condition } from './query-tokens';
-
 const dateExpressions = [
   /^(?<op>=|>=?|<=?)?(?<date>\d{4}-\d{2}-\d{2})$/,
   /^(?<start>\d{4}-\d{2}-\d{2}|\*)\.\.(?<end>\d{4}-\d{2}-\d{2}|\*)$/, // "YYYY-MM-DD..YYYY-MM-DD" or "YYYY-MM-DD..*"
@@ -29,16 +25,16 @@ export function parseDateExpression(dateExpr: string): [string, string] | null {
   if (date && isValidDate(date)) {
     if (op === '>=') {
       // Starting from this day midnight
-      return [date, 'infinity'];
+      return [date, ''];
     } else if (op === '>') {
       // Starting from next day midnight
-      return [nextDay(date), 'infinity'];
+      return [nextDay(date), ''];
     } else if (op === '<=') {
       // Ending at next day midnight, i.e. including all this day
-      return ['-infinity', nextDay(date)];
+      return ['', nextDay(date)];
     } else if (op === '<') {
       // Ending at this day midnight
-      return ['-infinity', date];
+      return ['', date];
     }
 
     // op === '=' or op is empty
@@ -46,7 +42,7 @@ export function parseDateExpression(dateExpr: string): [string, string] | null {
   }
 
   if (start && end && (isValidDate(start) || isValidDate(end))) {
-    return [start === '*' ? '-infinity' : start, end === '*' ? 'infinity' : nextDay(end)];
+    return [start === '*' ? '' : start, end === '*' ? '' : nextDay(end)];
   }
 
   return null;
@@ -60,8 +56,4 @@ function nextDay(dateString: string): string {
   const date = new Date(dateString);
   date.setDate(date.getDate() + 1);
   return date.toISOString().substring(0, 10);
-}
-
-export function dateConditionSQL(cond: Condition): string {
-  return pgFormat(`${cond.exclude ? 'not ' : ''}between %L and %L`, cond.args[0], cond.args[1]);
 }
