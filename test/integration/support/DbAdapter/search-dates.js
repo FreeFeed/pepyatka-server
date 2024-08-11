@@ -101,4 +101,9 @@ describe('Search by dates', () => {
     // posts[0] has all comments created on this interval
     expect(postIds, 'to equal', [posts[2].id, posts[1].id]);
   });
+
+  it('should be possible to use short date syntax', async () => {
+    const postIds = await dbAdapter.search('comment date:2020-01');
+    expect(postIds, 'to equal', [posts[2].id, posts[1].id, posts[0].id]);
+  });
 });

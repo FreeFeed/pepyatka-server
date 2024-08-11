@@ -127,7 +127,9 @@ Since `clicked-by:` makes sense only for comments, it switches the search scope 
 
 Since `clikes:` makes sense only for comments, it switches the search scope to comments. So the query `cat clikes:1` is equal to `in-comments: cat clikes:1`. Being used in post body scope (like `in-body: clikes:...`), `clikes:` is ignored.
 
-**date:*(interval)*** and **post-date:*(interval)*** limits search to content published on the specified date. Dates are in the format `YYYY-MM-DD`.
+**date:*(interval)*** and **post-date:*(interval)*** limits search to content published on the specified date. 
+
+Dates should be in the format `YYYY-MM-DD`, `YYYY-MM` or just `YYYY`. A date with a year only matches any time in that year. A date with a month and year matches any time in that month and year. A date with a day, month, and year matches any time at that specific date.
 
 The `date:` operator defines the date of the content being searched. The `foo date:2020-01-01` will search the "foo" word in posts published on 2020-01-01 or in comments published on 2020-01-01 (even if the post date is different).
 

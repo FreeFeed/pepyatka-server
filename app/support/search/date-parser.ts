@@ -1,6 +1,6 @@
 const dateExpressions = [
-  /^(?<op>=|>=?|<=?)?(?<date>\d{4}-\d{2}-\d{2})$/,
-  /^(?<start>\d{4}-\d{2}-\d{2}|\*)\.\.(?<end>\d{4}-\d{2}-\d{2}|\*)$/, // "YYYY-MM-DD..YYYY-MM-DD" or "YYYY-MM-DD..*"
+  /^(?<op>=|>=?|<=?)?(?<date>\d{4}(?:-\d{2}(?:-\d{2})?)?)$/, // "=YYYY-MM-DD", ">=YYYY-MM", "<=YYYY"
+  /^(?<start>\d{4}(?:-\d{2}(?:-\d{2})?)?|\*)\.\.(?<end>\d{4}(?:-\d{2}(?:-\d{2})?)?|\*)$/, // "YYYY-MM-DD..YYYY-MM-DD" or "YYYY-MM-DD..*"
 ];
 
 export function parseDateExpression(dateExpr: string): [string, string] | null {
@@ -24,25 +24,21 @@ export function parseDateExpression(dateExpr: string): [string, string] | null {
   // will be converted to '2020-01-01 00:00:00'.
   if (date && isValidDate(date)) {
     if (op === '>=') {
-      // Starting from this day midnight
-      return [date, ''];
+      return [startOf(date), ''];
     } else if (op === '>') {
-      // Starting from next day midnight
-      return [nextDay(date), ''];
+      return [endOf(date), ''];
     } else if (op === '<=') {
-      // Ending at next day midnight, i.e. including all this day
-      return ['', nextDay(date)];
+      return ['', endOf(date)];
     } else if (op === '<') {
-      // Ending at this day midnight
-      return ['', date];
+      return ['', startOf(date)];
     }
 
     // op === '=' or op is empty
-    return [date, nextDay(date)];
+    return [startOf(date), endOf(date)];
   }
 
   if (start && end && (isValidDate(start) || isValidDate(end))) {
-    return [start === '*' ? '' : start, end === '*' ? '' : nextDay(end)];
+    return [start === '*' ? '' : startOf(start), end === '*' ? '' : endOf(end)];
   }
 
   return null;
@@ -52,8 +48,23 @@ function isValidDate(dateString: string): boolean {
   return Number.isFinite(new Date(dateString).valueOf());
 }
 
-function nextDay(dateString: string): string {
+function startOf(dateString: string): string {
+  return new Date(dateString).toISOString().slice(0, 10);
+}
+
+function endOf(dateString: string): string {
   const date = new Date(dateString);
-  date.setDate(date.getDate() + 1);
-  return date.toISOString().substring(0, 10);
+
+  if (dateString.length === 4) {
+    // YYYY
+    date.setFullYear(date.getFullYear() + 1);
+  } else if (dateString.length === 7) {
+    // YYYY-MM
+    date.setMonth(date.getMonth() + 1);
+  } else {
+    // YYYY-MM-DD
+    date.setDate(date.getDate() + 1);
+  }
+
+  return date.toISOString().slice(0, 10);
 }
