@@ -32,7 +32,7 @@ Some operators takes user name as an arguments. In such operators you can use a 
 * in-my:
 * commented-by:
 * liked-by:
-* clicked-by:
+* cliked-by:
 * to:
 * has:
 * comments: *(interval)*
@@ -111,11 +111,11 @@ The "in:" operator has the "group:" alias, it left for compatibility.
 
 **to:user1,group2** limits search to posts published in group2 feed or written _to_ user1 as a direct message. This operator acts like **in:** for the groups but also allows to search in direct messages with the specific addressee.
 
-**clicked-by:user1,user2** limits search to comments licked by user1 or user2.
+**cliked-by:user1,user2** limits search to comments liked by user1 or user2.
 
-`cat clicked-by:alice` will find all comments liked by Alice with the "cat" word.
+`cat cliked-by:alice` will find all comments liked by Alice with the "cat" word.
 
-Since `clicked-by:` makes sense only for comments, it switches the search scope to comments. So the query `cat clicked-by:alice` is equal to `in-comments: cat clicked-by:alice`. Being used in post body scope (like `in-body: clicked-by:...`), `clicked-by:` is ignored.
+Since `cliked-by:` makes sense only for comments, it switches the search scope to comments. So the query `cat cliked-by:alice` is equal to `in-comments: cat cliked-by:alice`. Being used in post body scope (like `in-body: cliked-by:...`), `cliked-by:` is ignored.
 
 **has:images,audio** limits search to posts with files of the specified type. You can specify the concrete file type (only `images` or `audio` for now), or search for any files using the `has:files` form.
 

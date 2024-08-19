@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.22.0] - Not released
 ### Added
 - New search operators:
-  - `clicked-by:`
+  - `cliked-by:`
   - `has:`
   - `comments:`
   - `likes:`
