@@ -36,7 +36,7 @@ describe('Search by dates', () => {
         date: `2020-01-0${i + 1} 11:12:13Z`,
       });
 
-      // Every post has 3 comments created ath the same day, day after and day after that:
+      // Every post has 3 comments created on the same day, day after and day after that:
       // Jan 1   Jan 2  Jan 3  Jan 4  Jan 5
       // Post1
       // └Comm1  Comm2  Comm3
