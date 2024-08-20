@@ -1,9 +1,11 @@
+import { ISO8601DateString as DateString } from '../types';
+
 const dateExpressions = [
   /^(?<op>=|>=?|<=?)?(?<date>\d{4}(?:-\d{2}(?:-\d{2})?)?)$/, // "=YYYY-MM-DD", ">=YYYY-MM", "<=YYYY"
   /^(?<start>\d{4}(?:-\d{2}(?:-\d{2})?)?|\*)\.\.(?<end>\d{4}(?:-\d{2}(?:-\d{2})?)?|\*)$/, // "YYYY-MM-DD..YYYY-MM-DD" or "YYYY-MM-DD..*"
 ];
 
-export function parseDateExpression(dateExpr: string): [string, string] | null {
+export function parseDateExpression(dateExpr: string): [DateString | '', DateString | ''] | null {
   let match = null;
 
   for (const expression of dateExpressions) {
@@ -37,22 +39,26 @@ export function parseDateExpression(dateExpr: string): [string, string] | null {
     return [startOf(date), endOf(date)];
   }
 
-  if (start && end && (isValidDate(start) || isValidDate(end))) {
-    return [start === '*' ? '' : startOf(start), end === '*' ? '' : endOf(end)];
+  if (isValidDate(start) && isValidDate(end)) {
+    return [startOf(start), endOf(end)];
+  } else if (isValidDate(start)) {
+    return [startOf(start), ''];
+  } else if (isValidDate(end)) {
+    return ['', endOf(end)];
   }
 
   return null;
 }
 
-function isValidDate(dateString: string): boolean {
+function isValidDate(dateString: string): dateString is DateString {
   return Number.isFinite(new Date(dateString).valueOf());
 }
 
-function startOf(dateString: string): string {
-  return new Date(dateString).toISOString().slice(0, 10);
+function startOf(dateString: DateString): DateString {
+  return dateToISOString(new Date(dateString));
 }
 
-function endOf(dateString: string): string {
+function endOf(dateString: DateString): DateString {
   const date = new Date(dateString);
 
   if (dateString.length === 4) {
@@ -66,5 +72,9 @@ function endOf(dateString: string): string {
     date.setDate(date.getDate() + 1);
   }
 
-  return date.toISOString().slice(0, 10);
+  return dateToISOString(date);
+}
+
+function dateToISOString(date: Date): DateString {
+  return date.toISOString().slice(0, 10) as DateString;
 }
