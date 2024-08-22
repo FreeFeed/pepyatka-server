@@ -1,6 +1,6 @@
 import _ from 'lodash';
 
-type ListLike<T> = List<T> | T[] | { items: T[]; inclusive: boolean };
+export type ListLike<T> = List<T> | T[] | { items: T[]; inclusive: boolean };
 
 /**
  * List represents a possible open list of items. It can model two situation:
