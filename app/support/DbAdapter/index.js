@@ -34,7 +34,7 @@ import appTokensTrait from './app-tokens';
 import externalAuthTrait from './external-auth';
 import serverInfoTrait from './server-info';
 import searchTrait from './search';
-import { withDbHelpers } from './utils';
+import { withDbHelpers } from './db-helpers';
 import nowTrait from './now';
 import jobsTrait from './jobs';
 import authSessionsTrait from './auth-sessions';

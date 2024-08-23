@@ -195,11 +195,22 @@ export const listConditions: [RegExp, string][] = [
   [/^liked-?by$/, 'liked-by'],
   [/^to$/, 'to'],
   // Comments
-  // [/^cliked-?by$/, 'cliked-by'],
+  [/^clic?ked-?by$/, 'cliked-by'],
   // Authorship
   [/^from$/, 'from'],
   [/^authors?$/, 'author'],
   [/^by$/, 'author'], // synonym for "author"
+];
+
+export const dateConditions: [RegExp, string][] = [
+  [/^date$/, 'date'],
+  [/^post-?date$/, 'post-date'],
+];
+
+export const counterConditions: [RegExp, string][] = [
+  [/^likes?$/, 'likes'],
+  [/^comments?$/, 'comments'],
+  [/^clikes?$/, 'clikes'],
 ];
 
 // A simple trimmer, trims punctuation, separators and some symbols.

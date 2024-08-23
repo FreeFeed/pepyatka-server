@@ -17,7 +17,12 @@ import {
   Token,
   SeqTexts,
   AnyText,
+  IN_COMMENTS,
+  dateConditions,
+  counterConditions,
 } from './query-tokens';
+import { parseDateExpression } from './date-parser';
+import { parseCounterExpression } from './counter-parser';
 
 // -?(scope:)?(double-quoted-string|string)
 const tokenRe = XRegExp(
@@ -53,8 +58,8 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
     const { groups } = match;
 
     if (!groups) {
-      // typescript-hack. can never happen
-      throw new Error();
+      // This should never happen, but TypeScript requires this check
+      return;
     }
 
     if (groups.pipe) {
@@ -136,6 +141,49 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
         }
       }
 
+      // (-)date:2020-01-01..2020-01-02
+      for (const [re, condition] of dateConditions) {
+        if (!re.test(groups.cond)) {
+          continue;
+        }
+
+        const parsed = parseDateExpression(groups.word);
+
+        if (!parsed) {
+          break;
+        }
+
+        tokens.push(new Condition(!!groups.exclude, condition, parsed));
+        return;
+      }
+
+      // has:images,audio
+      if (groups.cond === 'has') {
+        const validWords = ['image', 'audio', 'file'];
+        const words = (groups.word as string)
+          .split(',')
+          .map((w) => w.replace(/s$/g, ''))
+          .filter((w) => validWords.includes(w));
+        tokens.push(new Condition(!!groups.exclude, 'has', words));
+        return;
+      }
+
+      // (-)comments:2..12
+      for (const [re, condition] of counterConditions) {
+        if (!re.test(groups.cond)) {
+          continue;
+        }
+
+        const parsed = parseCounterExpression(groups.word);
+
+        if (!parsed) {
+          break;
+        }
+
+        tokens.push(new Condition(!!groups.exclude, condition, parsed));
+        return;
+      }
+
       // Scope not found, treat as raw text
       tokens.push(
         new AnyText([new Text(!!groups.exclude, false, trimText(raw, { minPrefixLength }))]),
@@ -154,6 +202,25 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
       ]),
     );
   });
+
+  // Special cases: the 'clikes' and 'cliked-by:' operators creates an
+  // implicit in-comments: scope if there is not one defined already.
+  for (const op of ['clikes', 'cliked-by']) {
+    const opIdx = tokens.findIndex((t) => t instanceof Condition && t.condition === op);
+
+    if (opIdx !== -1) {
+      const scopeIdx = tokens.findLastIndex((t, i) => t instanceof ScopeStart && i < opIdx);
+
+      if (scopeIdx === -1 || scopeIdx > opIdx) {
+        // No scope defined before operator. Create implicit scope.
+        tokens.unshift(new ScopeStart(IN_COMMENTS));
+      } else if (tokens[scopeIdx] instanceof ScopeStart && tokens[scopeIdx].scope !== IN_COMMENTS) {
+        // Scope defined before operator, but it's not IN_COMMENTS. Ignore
+        // operator in this case.
+        tokens.splice(opIdx, 1);
+      }
+    }
+  }
 
   return flow([joinByPipes, joinByPluses])(tokens) as Token[];
 }
