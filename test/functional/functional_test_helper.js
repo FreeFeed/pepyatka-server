@@ -980,7 +980,7 @@ const PromisifiedIO = (host, options, events) => {
         if ('disconnect' in events) {
           try {
             events.disconnect();
-          } catch (e) {
+          } catch {
             // do nothing
           }
         }

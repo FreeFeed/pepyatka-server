@@ -43,7 +43,7 @@ export const restoration = compose([
         disable_comments: expect.it('to be a boolean'),
         via_restore: expect.it('to be an array').and('to have items satisfying', 'to be a string'),
       });
-    } catch (e) {
+    } catch {
       throw new ForbiddenException('Invalid data format');
     }
 
@@ -74,7 +74,7 @@ export const activities = compose([
 
     try {
       await expect(ctx.request.body, 'to exhaustively satisfy', { restore: true });
-    } catch (e) {
+    } catch {
       throw new ForbiddenException('Invalid data format');
     }
 

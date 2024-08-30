@@ -58,7 +58,7 @@ export function init(passport) {
           }
 
           done(null, user);
-        } catch (e) {
+        } catch {
           done({ message: 'We could not find the nickname you provided.' });
         }
       },

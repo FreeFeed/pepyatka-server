@@ -832,7 +832,7 @@ export default class PubsubListener {
 
           try {
             userId = await getAuthUserId(socket.authToken, socket);
-          } catch (e) {
+          } catch {
             // pass
           }
 

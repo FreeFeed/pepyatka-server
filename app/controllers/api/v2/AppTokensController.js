@@ -40,7 +40,7 @@ export const create = compose([
       try {
         new Address(mask);
         return false;
-      } catch (e) {
+      } catch {
         return true;
       }
     });
@@ -219,7 +219,7 @@ export const activate = compose([
 
     try {
       token.checkRestrictions(ctx);
-    } catch (err) {
+    } catch {
       throw new NotFoundException('Unknown or expired activation code');
     }
 

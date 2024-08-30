@@ -309,7 +309,7 @@ async function getUserLanguages(userId, sqlDate, depth = 50) {
       try {
         const { reliable, textBytes, languages } = await cld.detect(text);
         return reliable ? { textBytes, languages } : null;
-      } catch (e) {
+      } catch {
         // Failed to identify language
       }
 
