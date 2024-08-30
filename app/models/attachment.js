@@ -736,8 +736,10 @@ async function clearOrientation(fileName) {
 
   if (Object.keys(tagsToClean).length > 0) {
     try {
-      await exiftool.write(fileName, tagsToClean, ['-overwrite_original', '-ignoreMinorErrors']);
-    } catch (e) {
+      await exiftool.write(fileName, tagsToClean, {
+        writeArgs: ['-overwrite_original', '-ignoreMinorErrors'],
+      });
+    } catch {
       // It's ok to fail, we cannot do anything useful in this case
     }
   }

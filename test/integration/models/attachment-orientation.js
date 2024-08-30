@@ -89,7 +89,11 @@ async function createTestImage(filename, orientation) {
   await promisify(image.write.bind(image))(filename);
 
   if (orientation !== 0) {
-    await exiftool.write(filename, { 'Orientation#': orientation }, ['-overwrite_original']);
+    await exiftool.write(
+      filename,
+      { 'Orientation#': orientation },
+      { writeArgs: ['-overwrite_original'] },
+    );
   }
 }
 
