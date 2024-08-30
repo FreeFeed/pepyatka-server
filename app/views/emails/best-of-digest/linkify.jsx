@@ -96,7 +96,7 @@ class Linkify extends React.Component {
       });
 
       return elements.length === 1 ? elements[0] : elements;
-    } catch (err) {
+    } catch {
       // Do nothing
     }
 

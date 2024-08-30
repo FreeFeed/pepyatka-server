@@ -226,7 +226,7 @@ async function fetchJSON<R extends object>(url: string, params?: RequestInit) {
 
   try {
     respBody = (await response.json()) as R;
-  } catch (e) {
+  } catch {
     // pass
   }
 

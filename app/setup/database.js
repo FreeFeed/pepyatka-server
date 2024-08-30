@@ -35,6 +35,8 @@ function logAndQuit(type) {
     }
 
     debug(type, args);
+    console.error(args[0]);
+    console.error('Redis error, switching off server.');
     process.exit(1);
   };
 }

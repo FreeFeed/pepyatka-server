@@ -154,7 +154,7 @@ export default class UsersController {
       const safeRun = async (foo) => {
         try {
           await foo();
-        } catch (e) {
+        } catch {
           // pass
         }
       };
@@ -224,7 +224,7 @@ export default class UsersController {
       }
 
       await user.subscribeTo(onboardingUser);
-    } catch (e /* if e instanceof NotFoundException */) {
+    } catch {
       // if onboarding username is not found, just pass
     }
 

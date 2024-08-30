@@ -952,7 +952,7 @@ export function addModel(dbAdapter) {
 
       try {
         originalSize = await image.sizeAsync();
-      } catch (err) {
+      } catch {
         throw new BadRequestException('Not an image file');
       }
 

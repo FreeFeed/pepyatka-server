@@ -171,7 +171,7 @@ export function installInto(unexpected) {
       if (!expect.flags['not']) {
         try {
           return await session.receive(event);
-        } catch (e) {
+        } catch {
           // pass
         }
 
@@ -179,7 +179,7 @@ export function installInto(unexpected) {
       } else {
         try {
           await session.receive(event, silenceTimeout);
-        } catch (e) {
+        } catch {
           return null;
         }
 

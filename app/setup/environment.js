@@ -44,7 +44,7 @@ const checkIfMediaDirectoriesExist = async () => {
 
   try {
     await fsPromises.access(attachmentsDir, fs.W_OK);
-  } catch (e) {
+  } catch {
     gotErrors = true;
     log(`Attachments dir does not exist: ${attachmentsDir}`);
   }
@@ -54,7 +54,7 @@ const checkIfMediaDirectoriesExist = async () => {
 
     try {
       await fsPromises.access(thumbnailsDir, fs.W_OK);
-    } catch (e) {
+    } catch {
       gotErrors = true;
       log(`Thumbnails dir does not exist: ${thumbnailsDir}`);
     }

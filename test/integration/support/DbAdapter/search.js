@@ -162,7 +162,7 @@ describe('Search', () => {
           {
             query: 'in-comment:venus -in-body:luna',
             filter: (p) => p.userId !== luna.id,
-            comment: `all posts (by "venus") expect the Luna's (by "luna")`,
+            comment: `all posts (by "venus") except the Luna's (by "luna")`,
           },
         ]);
 
@@ -700,6 +700,79 @@ describe('Search', () => {
         comment: 'plus operator',
       },
     ]);
+  });
+
+  describe('Comment likes (`cliked-by:`)', () => {
+    let luna, mars, venus;
+
+    before(async () => {
+      await cleanDB($pg_database);
+
+      luna = new User({ username: 'luna', password: 'pw' });
+      mars = new User({ username: 'mars', password: 'pw' });
+      venus = new User({ username: 'venus', password: 'pw' });
+      await Promise.all([luna.create(), mars.create(), venus.create()]);
+
+      const [lunaFeed, marsFeed] = await Promise.all([
+        luna.getPostsTimeline(),
+        mars.getPostsTimeline(),
+      ]);
+
+      // Remove all elements from the 'posts' array
+      posts.length = 0;
+
+      posts.push(
+        new Post({
+          body: `luna post`,
+          userId: luna.id,
+          timelineIds: [lunaFeed.id],
+        }),
+      );
+      posts.push(
+        new Post({
+          body: `mars post`,
+          userId: mars.id,
+          timelineIds: [marsFeed.id],
+        }),
+      );
+
+      for (let i = 0; i < posts.length; i++) {
+        const post = posts[i];
+        await post.create(); // eslint-disable-line no-await-in-loop
+
+        const marsComment = new Comment({
+          body: `Mars comment to post ${post.userId === luna.id ? 'from Luna' : 'from Mars'}`,
+          userId: mars.id,
+          postId: post.id,
+        });
+        const lunaComment = new Comment({
+          body: `Luna comment to post ${post.userId === luna.id ? 'from Luna' : 'from Mars'}`,
+          userId: luna.id,
+          postId: post.id,
+        });
+        await marsComment.create(); // eslint-disable-line no-await-in-loop
+        await lunaComment.create(); // eslint-disable-line no-await-in-loop
+
+        // Luna likes Mars comment to her post
+        if (post.userId === luna.id) {
+          await marsComment.addLike(luna); // eslint-disable-line no-await-in-loop
+        }
+
+        // Venus likes all Mars comments
+        await marsComment.addLike(venus); // eslint-disable-line no-await-in-loop
+      }
+    });
+    after(() => Promise.all(posts.map((post) => post.destroy())));
+
+    it('should search comment liked by Luna', async () => {
+      const postIds = await dbAdapter.search('mars comment cliked-by:luna');
+      expect(postIds, 'to equal', [posts[0].id]);
+    });
+
+    it('should search comment NOT liked by Luna', async () => {
+      const postIds = await dbAdapter.search('mars comment -cliked-by:luna');
+      expect(postIds, 'to equal', [posts[1].id]);
+    });
   });
 
   describe('Search query complexity', () => {

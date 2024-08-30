@@ -88,7 +88,7 @@ describe('Controller middlewares', () => {
     it(`should not increment 'test-requests' counter after failed call`, async () => {
       try {
         await failHandler(ctx);
-      } catch (e) {
+      } catch {
         // pass
       }
 

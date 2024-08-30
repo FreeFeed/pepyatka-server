@@ -7,8 +7,6 @@ import os from 'os';
 import config from 'config';
 import createDebug from 'debug';
 import gm from 'gm';
-import { parseFile } from 'music-metadata';
-import { fileTypeFromFile } from 'file-type';
 import mime from 'mime-types';
 import mmm from 'mmmagic';
 import _ from 'lodash';
@@ -34,6 +32,8 @@ const execFile = util.promisify(childProcess.execFile);
 const debug = createDebug('freefeed:model:attachment');
 
 async function mimeTypeDetect(fileName, filePath) {
+  // We need to dynamic import from ES-only modules
+  const { fileTypeFromFile } = await import('file-type');
   // The file type is detected by checking the magic number of the buffer.
   const info = await fileTypeFromFile(filePath);
 
@@ -307,6 +307,12 @@ export function addModel(dbAdapter) {
         }
 
         // Analyze metadata to get Artist & Title
+        //
+        // We need to dynamic import from ES-only modules. Also, for some reason
+        // the VSCode eslint extension cannot resolve the 'music-metadata'.
+        //
+        // eslint-disable-next-line import/no-unresolved
+        const { parseFile } = await import('music-metadata');
         const { common: metadata } = await parseFile(tmpAttachmentFile);
 
         debug(`Metadata of ${tmpAttachmentFileName}`, metadata);
@@ -736,8 +742,10 @@ async function clearOrientation(fileName) {
 
   if (Object.keys(tagsToClean).length > 0) {
     try {
-      await exiftool.write(fileName, tagsToClean, ['-overwrite_original', '-ignoreMinorErrors']);
-    } catch (e) {
+      await exiftool.write(fileName, tagsToClean, {
+        writeArgs: ['-overwrite_original', '-ignoreMinorErrors'],
+      });
+    } catch {
       // It's ok to fail, we cannot do anything useful in this case
     }
   }
