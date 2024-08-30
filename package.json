@@ -59,7 +59,7 @@
     "email-validator": "~2.0.4",
     "exiftool-vendored": "~28.2.1",
     "ff-url-finder": "~2.3.7",
-    "file-type": "~19.3.0",
+    "file-type": "~19.4.1",
     "gifsicle": "~7.0.1",
     "gm": "~1.25.0",
     "grapheme-breaker": "0.3.2",
