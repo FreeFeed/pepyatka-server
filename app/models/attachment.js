@@ -7,7 +7,11 @@ import os from 'os';
 import config from 'config';
 import createDebug from 'debug';
 import gm from 'gm';
-import { parseFile } from 'music-metadata';
+// The 'music-metadata' is a pure ESM module and for some reason the VSCode
+// eslint extension cannot resolve it:(
+//
+// eslint-disable-next-line import/no-unresolved
+import { loadMusicMetadata } from 'music-metadata';
 import { fileTypeFromFile } from 'file-type';
 import mime from 'mime-types';
 import mmm from 'mmmagic';
@@ -20,6 +24,13 @@ import { exiftool } from 'exiftool-vendored';
 
 import { getS3 } from '../support/s3';
 import { sanitizeMediaMetadata, SANITIZE_NONE, SANITIZE_VERSION } from '../support/sanitize-media';
+
+async function parseFileMetadata(...args) {
+  // The loadMusicMetadata is a CJS-compatible 'music-metadata' entrypoint, see
+  // https://github.com/Borewit/music-metadata/issues/1357#issuecomment-2321329951
+  const { parseFile } = await loadMusicMetadata();
+  return parseFile(...args);
+}
 
 const mvAsync = util.promisify(mv);
 
@@ -307,7 +318,7 @@ export function addModel(dbAdapter) {
         }
 
         // Analyze metadata to get Artist & Title
-        const { common: metadata } = await parseFile(tmpAttachmentFile);
+        const { common: metadata } = await parseFileMetadata(tmpAttachmentFile);
 
         debug(`Metadata of ${tmpAttachmentFileName}`, metadata);
 
