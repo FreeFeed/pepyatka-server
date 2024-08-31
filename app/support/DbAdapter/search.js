@@ -72,6 +72,9 @@ const searchTrait = (superClass) =>
       const fileTypesSQL = fileTypesFiltersSQL(parsedQuery, 'a');
       const useFilesTable = isNonTrivialSQL(fileTypesSQL);
 
+      // Posts privacy flags
+      const postsPrivacySQL = privacyFiltersSQL(parsedQuery, 'p');
+
       // Counters
       const postCountersSQL = andJoin([
         countersFiltersSQL(parsedQuery, 'comments', 'pc.comments_count'),
@@ -183,6 +186,7 @@ const searchTrait = (superClass) =>
           commentsRestrictionSQL,
           postCountersSQL,
           commentCountersSQL,
+          postsPrivacySQL,
         ]),
         `group by p.uid, p.${sort}_at, p.id`,
         `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
@@ -426,6 +430,43 @@ function dateFiltersSQL(tokens, field, targetScope) {
     }
   });
   return andJoin(result);
+}
+
+function privacyFiltersSQL(tokens, postsTable) {
+  const privacyWords = ['public', 'private', 'protected'];
+  let positive = null;
+  let negative = null;
+  walkWithScope(tokens, (token) => {
+    if (token instanceof Condition && token.condition === 'is') {
+      const words = token.args.filter((w) => privacyWords.includes(w));
+
+      if (!token.exclude) {
+        positive = positive ? union(positive, words) : uniq(words);
+      } else {
+        negative = negative ? union(negative, words) : uniq(words);
+      }
+    }
+  });
+
+  return andJoin([
+    positive && orJoin(positive.map((p) => privacySQLCondition(p, postsTable))),
+    negative && sqlNot(orJoin(negative.map((p) => privacySQLCondition(p, postsTable)))),
+  ]);
+}
+
+/**
+ * @param {'public' | 'private' | 'protected'} privacyWord
+ * @param {string} postsTable
+ * @returns {string}
+ */
+function privacySQLCondition(privacyWord, postsTable) {
+  if (privacyWord === 'public') {
+    return `not ${postsTable}.is_protected`;
+  } else if (privacyWord === 'protected') {
+    return `${postsTable}.is_protected and not ${postsTable}.is_private`;
+  }
+
+  return `${postsTable}.is_private`;
 }
 
 function countersFiltersSQL(tokens, condition, field) {

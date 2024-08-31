@@ -168,6 +168,14 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
         return;
       }
 
+      // is:public,protected
+      if (groups.cond === 'is') {
+        const validWords = ['public', 'protected', 'private'];
+        const words = (groups.word as string).split(',').filter((w) => validWords.includes(w));
+        tokens.push(new Condition(!!groups.exclude, 'is', words));
+        return;
+      }
+
       // (-)comments:2..12
       for (const [re, condition] of counterConditions) {
         if (!re.test(groups.cond)) {
