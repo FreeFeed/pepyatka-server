@@ -35,6 +35,7 @@ Some operators takes user name as an arguments. In such operators you can use a 
 * cliked-by:
 * to:
 * has:
+* is:
 * comments: *(interval)*
 * likes: *(interval)*
 * clikes: *(interval)*
@@ -117,7 +118,9 @@ The "in:" operator has the "group:" alias, it left for compatibility.
 
 Since `cliked-by:` makes sense only for comments, it switches the search scope to comments. So the query `cat cliked-by:alice` is equal to `in-comments: cat cliked-by:alice`. Being used in post body scope (like `in-body: cliked-by:...`), `cliked-by:` is ignored.
 
-**has:images,audio** limits search to posts with files of the specified type. You can specify the concrete file type (only `images` or `audio` for now), or search for any files using the `has:files` form.
+**is:private,protected** limits search to posts with the specified visibility. These are `private`, `protected` and `public`.
+
+**has:images,audio** limits search to posts with files of the specified type. You can specify the concrete file type (only `images` or `audio` for now), or search for any files using the `has:files` form. You can also specify the file extension, for example `has:mp3` will search for files with the `mp3` extension.
 
 **comments:*(interval)*** limits search to posts with the specified number of comments.
 

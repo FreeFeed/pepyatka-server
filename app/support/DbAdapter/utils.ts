@@ -74,7 +74,7 @@ export function sqlNot(statement: string): string {
     return 'true';
   }
 
-  return `not ${statement}`;
+  return `not ${statement.includes(' ') ? `(${statement})` : statement}`;
 }
 
 // These helpers allow to use the IN operator with the empty list of values. 'IN

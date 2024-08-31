@@ -157,14 +157,24 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
         return;
       }
 
-      // has:images,audio
+      // has:images,audio, has:jpg or has:.jpg
       if (groups.cond === 'has') {
-        const validWords = ['image', 'audio', 'file'];
-        const words = (groups.word as string)
-          .split(',')
-          .map((w) => w.replace(/s$/g, ''))
-          .filter((w) => validWords.includes(w));
+        const words = (groups.word as string).split(',').map((w) => {
+          if (/^images?|audios?|files?$/.test(w)) {
+            return w.replace(/s$/g, '');
+          }
+
+          return w.startsWith('.') ? w : `.${w}`;
+        });
         tokens.push(new Condition(!!groups.exclude, 'has', words));
+        return;
+      }
+
+      // is:public,protected
+      if (groups.cond === 'is') {
+        const validWords = ['public', 'protected', 'private'];
+        const words = (groups.word as string).split(',').filter((w) => validWords.includes(w));
+        tokens.push(new Condition(!!groups.exclude, 'is', words));
         return;
       }
 
