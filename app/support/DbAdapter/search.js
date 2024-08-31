@@ -495,7 +495,7 @@ function intervalSQL(token, field) {
   return 'false';
 }
 
-const validFileTypes = ['audio', 'image', 'general'];
+const commonFileTypes = ['audio', 'image', 'general'];
 /**
  * Returns aggregated List of file types used in 'has:' conditions. Returns null
  * if none of such conditions present.
@@ -517,8 +517,8 @@ function getFileTypes(tokens) {
     // Select only the valid file types
     const argTypes = token.args
       // The 'file' type means 'audio, image, or general'
-      .flatMap((a) => (a === 'file' ? validFileTypes : a))
-      .filter((a) => validFileTypes.includes(a));
+      .flatMap((a) => (a === 'file' ? commonFileTypes : a))
+      .filter((a) => commonFileTypes.includes(a) || a.startsWith('.'));
 
     if (!token.exclude) {
       positive = positive ? union(positive, argTypes) : uniq(argTypes);
@@ -536,12 +536,25 @@ function getFileTypes(tokens) {
  * @returns {string|null}
  */
 function fileTypesToAggregate(types, attTable) {
-  if (types.length === validFileTypes.length) {
+  if (commonFileTypes.every((t) => types.includes(t))) {
     // Any type is valid
     return `bool_or(${attTable}.media_type is not null)`;
   }
 
-  return `bool_or(${orJoin(types.map((t) => `${attTable}.media_type = '${t}'`))})`;
+  return `bool_or(${orJoin(
+    types.map((t) => {
+      if (t.startsWith('.')) {
+        // This is a file extension
+        return pgFormat(
+          `lower(reverse(split_part(reverse(${attTable}.file_name), '.', 1))) = %L`,
+          t.replace(/^\./, ''),
+        );
+      }
+
+      // This is a media type
+      return pgFormat(`${attTable}.media_type = %L`, t);
+    }),
+  )})`;
 }
 
 function fileTypesFiltersSQL(tokens, attTable) {

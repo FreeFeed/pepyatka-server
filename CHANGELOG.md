@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.23.0] - Not released
 ### Added
-- Additional search operators:
-  - `is:`
+- The new `is:` search operator
+### Changed
+- The `has` search operator now accepts file extensions (as in `has:pdf` or
+  `has:.pdf`)
 
 ## [2.22.0] - 2024-08-30
 ### Added
