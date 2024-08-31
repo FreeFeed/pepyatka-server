@@ -72,6 +72,9 @@ const searchTrait = (superClass) =>
       const fileTypesSQL = fileTypesFiltersSQL(parsedQuery, 'a');
       const useFilesTable = isNonTrivialSQL(fileTypesSQL);
 
+      // Posts privacy flags
+      const postsPrivacySQL = privacyFiltersSQL(parsedQuery, 'p');
+
       // Counters
       const postCountersSQL = andJoin([
         countersFiltersSQL(parsedQuery, 'comments', 'pc.comments_count'),
@@ -130,9 +133,9 @@ const searchTrait = (superClass) =>
 
       if (useCommentsTable) {
         const notBannedSQLFabric = await this.notBannedActionsSQLFabric(viewerId);
-        commentsRestrictionSQL = andJoin([
-          pgFormat('(c.hide_type is null or c.hide_type=%L)', Comment.VISIBLE),
-          notBannedSQLFabric('c'),
+        commentsRestrictionSQL = orJoin([
+          'c.id is null',
+          andJoin([pgFormat('c.hide_type=%L', Comment.VISIBLE), notBannedSQLFabric('c')]),
         ]);
       }
 
@@ -183,6 +186,7 @@ const searchTrait = (superClass) =>
           commentsRestrictionSQL,
           postCountersSQL,
           commentCountersSQL,
+          postsPrivacySQL,
         ]),
         `group by p.uid, p.${sort}_at, p.id`,
         `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
@@ -428,6 +432,43 @@ function dateFiltersSQL(tokens, field, targetScope) {
   return andJoin(result);
 }
 
+function privacyFiltersSQL(tokens, postsTable) {
+  const privacyWords = ['public', 'private', 'protected'];
+  let positive = null;
+  let negative = null;
+  walkWithScope(tokens, (token) => {
+    if (token instanceof Condition && token.condition === 'is') {
+      const words = token.args.filter((w) => privacyWords.includes(w));
+
+      if (!token.exclude) {
+        positive = positive ? union(positive, words) : uniq(words);
+      } else {
+        negative = negative ? union(negative, words) : uniq(words);
+      }
+    }
+  });
+
+  return andJoin([
+    positive && orJoin(positive.map((p) => privacySQLCondition(p, postsTable))),
+    negative && sqlNot(orJoin(negative.map((p) => privacySQLCondition(p, postsTable)))),
+  ]);
+}
+
+/**
+ * @param {'public' | 'private' | 'protected'} privacyWord
+ * @param {string} postsTable
+ * @returns {string}
+ */
+function privacySQLCondition(privacyWord, postsTable) {
+  if (privacyWord === 'public') {
+    return `not ${postsTable}.is_protected`;
+  } else if (privacyWord === 'protected') {
+    return `${postsTable}.is_protected and not ${postsTable}.is_private`;
+  }
+
+  return `${postsTable}.is_private`;
+}
+
 function countersFiltersSQL(tokens, condition, field) {
   const result = [];
 
@@ -454,7 +495,7 @@ function intervalSQL(token, field) {
   return 'false';
 }
 
-const validFileTypes = ['audio', 'image', 'general'];
+const commonFileTypes = ['audio', 'image', 'general'];
 /**
  * Returns aggregated List of file types used in 'has:' conditions. Returns null
  * if none of such conditions present.
@@ -476,8 +517,8 @@ function getFileTypes(tokens) {
     // Select only the valid file types
     const argTypes = token.args
       // The 'file' type means 'audio, image, or general'
-      .flatMap((a) => (a === 'file' ? validFileTypes : a))
-      .filter((a) => validFileTypes.includes(a));
+      .flatMap((a) => (a === 'file' ? commonFileTypes : a))
+      .filter((a) => commonFileTypes.includes(a) || a.startsWith('.'));
 
     if (!token.exclude) {
       positive = positive ? union(positive, argTypes) : uniq(argTypes);
@@ -495,12 +536,25 @@ function getFileTypes(tokens) {
  * @returns {string|null}
  */
 function fileTypesToAggregate(types, attTable) {
-  if (types.length === validFileTypes.length) {
+  if (commonFileTypes.every((t) => types.includes(t))) {
     // Any type is valid
     return `bool_or(${attTable}.media_type is not null)`;
   }
 
-  return `bool_or(${orJoin(types.map((t) => `${attTable}.media_type = '${t}'`))})`;
+  return `bool_or(${orJoin(
+    types.map((t) => {
+      if (t.startsWith('.')) {
+        // This is a file extension
+        return pgFormat(
+          `lower(reverse(split_part(reverse(${attTable}.file_name), '.', 1))) = %L`,
+          t.replace(/^\./, ''),
+        );
+      }
+
+      // This is a media type
+      return pgFormat(`${attTable}.media_type = %L`, t);
+    }),
+  )})`;
 }
 
 function fileTypesFiltersSQL(tokens, attTable) {

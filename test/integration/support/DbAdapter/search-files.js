@@ -68,6 +68,16 @@ describe('Search by file types', () => {
     expect(postIds, 'to equal', [posts[1].id, posts[0].id]);
   });
 
+  it('should search posts with .jpg files', async () => {
+    const postIds = await dbAdapter.search('has:jpg');
+    expect(postIds, 'to equal', [posts[0].id]);
+  });
+
+  it('should search posts with images but without the .jpg files', async () => {
+    const postIds = await dbAdapter.search('has:images -has:.jpg');
+    expect(postIds, 'to equal', [posts[1].id]);
+  });
+
   it('should search posts with audio', async () => {
     const postIds = await dbAdapter.search('has:audio');
     expect(postIds, 'to equal', [posts[1].id]);
