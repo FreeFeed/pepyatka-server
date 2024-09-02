@@ -68,6 +68,8 @@ const searchTrait = (superClass) =>
       const postDateSQL = dateFiltersSQL(parsedQuery, 'p.created_at', IN_POSTS);
       const commentDateSQL = dateFiltersSQL(parsedQuery, 'c.created_at', IN_COMMENTS);
 
+      const dateSQL = andJoin([commonDateSQL, postDateSQL, commentDateSQL]);
+
       // Files
       const fileTypesSQL = fileTypesFiltersSQL(parsedQuery, 'a');
       const useFilesTable = isNonTrivialSQL(fileTypesSQL);
@@ -139,18 +141,40 @@ const searchTrait = (superClass) =>
         ]);
       }
 
-      // Building the full query
+      /**
+       * Text queries:
+       *
+       * The text query logic is the following:
+       *
+       *     (p.body_tsvector @@ commonQuery OR c.body_tsvector @@ commonQuery)
+       *     AND p.body_tsvector @@ postsOnlyQuery
+       *     AND c.body_tsvector @@ commentsOnlyQuery
+       *
+       * PostgreSQL is not very good at optimizing in such cases, so we replace
+       * OR with two queries with UNION:
+       *
+       *     p.body_tsvector @@ commonQuery
+       *     AND p.body_tsvector @@ postsOnlyQuery
+       *     AND c.body_tsvector @@ commentsOnlyQuery
+       *       UNION
+       *     c.body_tsvector @@ commonQuery
+       *     AND p.body_tsvector @@ postsOnlyQuery
+       *     AND c.body_tsvector @@ commentsOnlyQuery
+       */
 
-      const textSQL = andJoin([
-        commonTextQuery &&
-          orJoin([
-            `p.body_tsvector @@ ${commonTextQuery}`,
-            `c.body_tsvector @@ ${commonTextQuery}`,
-          ]),
+      const postsPartTextSQL = andJoin([
+        commonTextQuery && `p.body_tsvector @@ ${commonTextQuery}`,
         postsOnlyTextQuery && `p.body_tsvector @@ ${postsOnlyTextQuery}`,
         commentsOnlyTextQuery && `c.body_tsvector @@ ${commentsOnlyTextQuery}`,
       ]);
 
+      const commentsPartTextSQL = andJoin([
+        commonTextQuery && `c.body_tsvector @@ ${commonTextQuery}`,
+        postsOnlyTextQuery && `p.body_tsvector @@ ${postsOnlyTextQuery}`,
+        commentsOnlyTextQuery && `c.body_tsvector @@ ${commentsOnlyTextQuery}`,
+      ]);
+
+      // Authors
       const authorsSQL = andJoin([
         commonAuthors &&
           orJoin([sqlIn('p.user_id', commonAuthors), sqlIn('c.user_id', commonAuthors)]),
@@ -158,9 +182,43 @@ const searchTrait = (superClass) =>
         commentOnlyAuthors && sqlIn('c.user_id', commentOnlyAuthors),
       ]);
 
-      const dateSQL = andJoin([commonDateSQL, postDateSQL, commentDateSQL]);
+      // Building the full query
 
-      const fullSQL = [
+      const fromSQL = joinLines([
+        `from posts p`,
+        `join users u on p.user_id = u.uid`,
+        useCommentsTable && `left join comments c on c.post_id = p.uid`,
+        useCLikesTable && `left join comment_likes cl on cl.comment_id = c.id`,
+        useFilesTable && `left join attachments a on a.post_id = p.uid`,
+        usePostCountersTable && `join post_counters pc on pc.post_id = p.uid`,
+        useCommentCountersTable && `join comment_counters cc on cc.comment_id = c.uid`,
+      ]);
+
+      const commonWhereSQL = andJoin([
+        authorsSQL,
+        dateSQL,
+        postsRestrictionsSQL,
+        commentsRestrictionSQL,
+        postCountersSQL,
+        commentCountersSQL,
+        postsPrivacySQL,
+      ]);
+
+      const [postsPartQuery, commentsPartQuery] = [postsPartTextSQL, commentsPartTextSQL].map(
+        (textQuery) =>
+          // The selecting query is the same for both UNION's members, the
+          // difference is only in the textQuery condition
+          joinLines([
+            `select p.uid, p.${sort}_at as date, p.id`,
+            fromSQL,
+            `where`,
+            andJoin([textQuery, commonWhereSQL]),
+            `group by p.uid, p.${sort}_at, p.id`,
+            `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
+          ]),
+      );
+
+      const fullSQL = joinLines([
         // Use CTE here for better performance. PostgreSQL optimizer cannot
         // properly optimize conditions like `where feed_ids && '{111}' and
         // user_id <> '222-222-222'`. It is better to filter `feed_ids &&` first
@@ -169,31 +227,9 @@ const searchTrait = (superClass) =>
         postsFeedsSQL !== 'true' &&
           `with posts as materialized (select * from posts p where ${postsFeedsSQL})`,
 
-        `select p.uid, p.${sort}_at as date, p.id`,
-        `from posts p`,
-        `join users u on p.user_id = u.uid`,
-        useCommentsTable && `left join comments c on c.post_id = p.uid`,
-        useCLikesTable && `left join comment_likes cl on cl.comment_id = c.id`,
-        useFilesTable && `left join attachments a on a.post_id = p.uid`,
-        usePostCountersTable && `join post_counters pc on pc.post_id = p.uid`,
-        useCommentCountersTable && `join comment_counters cc on cc.comment_id = c.uid`,
-        `where`,
-        andJoin([
-          textSQL,
-          authorsSQL,
-          dateSQL,
-          postsRestrictionsSQL,
-          commentsRestrictionSQL,
-          postCountersSQL,
-          commentCountersSQL,
-          postsPrivacySQL,
-        ]),
-        `group by p.uid, p.${sort}_at, p.id`,
-        `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
-        `order by date desc, p.id desc limit ${+limit} offset ${+offset}`,
-      ]
-        .filter(Boolean)
-        .join('\n');
+        joinLines([postsPartQuery, useCommentsTable && commentsPartQuery], 'union'),
+        `order by date desc, id desc limit ${+limit} offset ${+offset}`,
+      ]);
 
       // console.log(fullSQL);
 
@@ -593,4 +629,8 @@ function namesToIds(list, accountsMap) {
 
 function isNonTrivialSQL(sql) {
   return sql && sql !== 'true' && sql !== 'false';
+}
+
+function joinLines(textLines, joiner = '') {
+  return textLines.filter(Boolean).join(joiner ? `\n${joiner}\n` : '\n');
 }
