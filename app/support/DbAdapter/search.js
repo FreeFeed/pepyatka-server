@@ -43,9 +43,21 @@ const searchTrait = (superClass) =>
         throw new Error(`The search query is too complex, try to simplify it`);
       }
 
-      if (!viewerId && parsedQuery.some((t) => t instanceof Condition && t.condition === 'in-my')) {
+      if (!viewerId && parsedQuery.some((t) => isCondition(t, 'in-my'))) {
         throw new Error(`Please sign in to use 'in-my:' filter`);
       }
+
+      let hasPostTokens = false;
+      let hasCommentTokens = false;
+      walkWithScope(parsedQuery, (token, currentScope) => {
+        if (currentScope & IN_POSTS) {
+          hasPostTokens = true;
+        }
+
+        if (currentScope & IN_COMMENTS) {
+          hasCommentTokens = true;
+        }
+      });
 
       // Map from username to User/Group object (or null)
       const accountsMap = await this._getAccountsUsedInQuery(parsedQuery, viewerId);
@@ -55,10 +67,13 @@ const searchTrait = (superClass) =>
       const postsOnlyTextQuery = getTSQuery(parsedQuery, IN_POSTS); // Search for this text only in posts
       const commentsOnlyTextQuery = getTSQuery(parsedQuery, IN_COMMENTS); // Search for this text only in comments
 
-      // Authorship
-      const commonAuthors = namesToIds(getAuthorNames(parsedQuery, IN_ALL), accountsMap);
-      let postOnlyAuthors = namesToIds(getAuthorNames(parsedQuery, IN_POSTS), accountsMap);
-      const commentOnlyAuthors = namesToIds(getAuthorNames(parsedQuery, IN_COMMENTS), accountsMap);
+      // Text authorship (the 'author:'/'by:' filter)
+      const commonTextAuthors = namesToIds(getAuthorNames(parsedQuery, IN_ALL), accountsMap);
+      const postTextAuthors = namesToIds(getAuthorNames(parsedQuery, IN_POSTS), accountsMap);
+      const commentTextAuthors = namesToIds(getAuthorNames(parsedQuery, IN_COMMENTS), accountsMap);
+
+      // Post author filter (the 'from:' filter)
+      let postAuthors = namesToIds(getPostAuthorNames(parsedQuery), accountsMap);
 
       // Date
       const commonDateSQL = orJoin([
@@ -109,7 +124,7 @@ const searchTrait = (superClass) =>
         if (orPostsFromMe) {
           postsFeedsSQL = orJoin([postsFeedsSQL, pgFormat('p.user_id=%L', viewerId)]);
         } else {
-          postOnlyAuthors = List.intersection(postOnlyAuthors, new List([viewerId], false));
+          postAuthors = List.intersection(postAuthors, new List([viewerId], false));
         }
       }
 
@@ -123,8 +138,8 @@ const searchTrait = (superClass) =>
       const useCommentsTable =
         !!commentsOnlyTextQuery ||
         !!commonTextQuery ||
-        !commentOnlyAuthors.isEverything() ||
-        !commonAuthors.isEverything() ||
+        !commentTextAuthors.isEverything() ||
+        !commonTextAuthors.isEverything() ||
         useCLikesTable ||
         useCommentCountersTable ||
         isNonTrivialSQL(commonDateSQL) ||
@@ -175,12 +190,17 @@ const searchTrait = (superClass) =>
       ]);
 
       // Authors
-      const authorsSQL = andJoin([
-        commonAuthors &&
-          orJoin([sqlIn('p.user_id', commonAuthors), sqlIn('c.user_id', commonAuthors)]),
-        postOnlyAuthors && sqlIn('p.user_id', postOnlyAuthors),
-        commentOnlyAuthors && sqlIn('c.user_id', commentOnlyAuthors),
+      const postTextsAuthorsSQL = andJoin([
+        commonTextAuthors && sqlIn('p.user_id', commonTextAuthors),
+        postTextAuthors && sqlIn('p.user_id', postTextAuthors),
       ]);
+
+      const commentTextsAuthorsSQL = andJoin([
+        commonTextAuthors && sqlIn('c.user_id', commonTextAuthors),
+        commentTextAuthors && sqlIn('c.user_id', commentTextAuthors),
+      ]);
+
+      const postsAuthorsFilterSQL = andJoin([postAuthors && sqlIn('p.user_id', postAuthors)]);
 
       // Building the full query
 
@@ -195,7 +215,7 @@ const searchTrait = (superClass) =>
       ]);
 
       const commonWhereSQL = andJoin([
-        authorsSQL,
+        postsAuthorsFilterSQL,
         dateSQL,
         postsRestrictionsSQL,
         commentsRestrictionSQL,
@@ -204,18 +224,20 @@ const searchTrait = (superClass) =>
         postsPrivacySQL,
       ]);
 
-      const [postsPartQuery, commentsPartQuery] = [postsPartTextSQL, commentsPartTextSQL].map(
-        (textQuery) =>
-          // The selecting query is the same for both UNION's members, the
-          // difference is only in the textQuery condition
-          joinLines([
-            `select p.uid, p.${sort}_at as date, p.id`,
-            fromSQL,
-            `where`,
-            andJoin([textQuery, commonWhereSQL]),
-            `group by p.uid, p.${sort}_at, p.id`,
-            `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
-          ]),
+      const [postsPartQuery, commentsPartQuery] = [
+        andJoin([postsPartTextSQL, postTextsAuthorsSQL]),
+        andJoin([commentsPartTextSQL, commentTextsAuthorsSQL]),
+      ].map((partSQL) =>
+        // The selecting query is almost the same for both UNION's members, the
+        // difference is only in the partSQL condition
+        joinLines([
+          `select p.uid, p.${sort}_at as date, p.id`,
+          fromSQL,
+          `where`,
+          andJoin([partSQL, commonWhereSQL]),
+          `group by p.uid, p.${sort}_at, p.id`,
+          `having ${andJoin([fileTypesSQL, cLikesSQL])}`,
+        ]),
       );
 
       const fullSQL = joinLines([
@@ -227,7 +249,13 @@ const searchTrait = (superClass) =>
         postsFeedsSQL !== 'true' &&
           `with posts as materialized (select * from posts p where ${postsFeedsSQL})`,
 
-        joinLines([postsPartQuery, useCommentsTable && commentsPartQuery], 'union'),
+        joinLines(
+          [
+            (hasPostTokens || !hasCommentTokens) && postsPartQuery,
+            useCommentsTable && commentsPartQuery,
+          ],
+          'union',
+        ),
         `order by date desc, id desc limit ${+limit} offset ${+offset}`,
       ]);
 
@@ -387,19 +415,27 @@ function walkWithScope(tokens, action) {
       continue;
     }
 
-    action(token, currentScope);
+    action(token, token instanceof InScope ? token.scope : currentScope);
   }
+}
+
+function walkInScope(tokens, scope, action) {
+  walkWithScope(tokens, (token, currentScope) => currentScope === scope && action(token));
+}
+
+function isCondition(token, condition) {
+  return token instanceof Condition && token.condition === condition;
 }
 
 function getTSQuery(tokens, targetScope) {
   const result = [];
 
-  walkWithScope(tokens, (token, currentScope) => {
-    if (token instanceof SeqTexts && currentScope === targetScope) {
+  walkInScope(tokens, targetScope, (token) => {
+    if (token instanceof SeqTexts) {
       result.push(token.toTSQuery());
     }
 
-    if (token instanceof InScope && token.scope === targetScope) {
+    if (token instanceof InScope) {
       result.push(token.text.toTSQuery());
     }
   });
@@ -410,15 +446,23 @@ function getTSQuery(tokens, targetScope) {
 function getAuthorNames(tokens, targetScope) {
   let result = List.everything();
 
-  walkWithScope(tokens, (token, currentScope) => {
-    if (
-      token instanceof Condition &&
-      ((token.condition === 'from' && targetScope === IN_POSTS) ||
-        (token.condition === 'author' && targetScope === currentScope))
-    ) {
+  walkInScope(tokens, targetScope, (token) => {
+    if (isCondition(token, 'author')) {
       result = List.intersection(result, token.exclude ? List.inverse(token.args) : token.args);
     }
   });
+
+  return result;
+}
+
+function getPostAuthorNames(tokens) {
+  let result = List.everything();
+
+  for (const token of tokens) {
+    if (isCondition(token, 'from')) {
+      result = List.intersection(result, token.exclude ? List.inverse(token.args) : token.args);
+    }
+  }
 
   return result;
 }
@@ -427,12 +471,8 @@ function getClikesAuthorsSQL(tokens, field, accountsMap) {
   let positive = null;
   let negative = null;
 
-  walkWithScope(tokens, (token, currentScope) => {
-    if (
-      currentScope === IN_COMMENTS &&
-      token instanceof Condition &&
-      token.condition === 'cliked-by'
-    ) {
+  walkInScope(tokens, IN_COMMENTS, (token) => {
+    if (isCondition(token, 'cliked-by')) {
       if (!token.exclude) {
         positive = positive ? union(positive, token.args) : uniq(token.args);
       } else {
@@ -458,9 +498,8 @@ function dateFiltersSQL(tokens, field, targetScope) {
   const result = [];
   walkWithScope(tokens, (token, currentScope) => {
     if (
-      token instanceof Condition &&
-      ((token.condition === 'post-date' && targetScope === IN_POSTS) ||
-        (token.condition === 'date' && currentScope === targetScope))
+      (isCondition(token, 'post-date') && targetScope === IN_POSTS) ||
+      (isCondition(token, 'date') && currentScope === targetScope)
     ) {
       result.push(intervalSQL(token, field));
     }
@@ -472,17 +511,20 @@ function privacyFiltersSQL(tokens, postsTable) {
   const privacyWords = ['public', 'private', 'protected'];
   let positive = null;
   let negative = null;
-  walkWithScope(tokens, (token) => {
-    if (token instanceof Condition && token.condition === 'is') {
-      const words = token.args.filter((w) => privacyWords.includes(w));
 
-      if (!token.exclude) {
-        positive = positive ? union(positive, words) : uniq(words);
-      } else {
-        negative = negative ? union(negative, words) : uniq(words);
-      }
+  for (const token of tokens) {
+    if (!isCondition(token, 'is')) {
+      continue;
     }
-  });
+
+    const words = token.args.filter((w) => privacyWords.includes(w));
+
+    if (!token.exclude) {
+      positive = positive ? union(positive, words) : uniq(words);
+    } else {
+      negative = negative ? union(negative, words) : uniq(words);
+    }
+  }
 
   return andJoin([
     positive && orJoin(positive.map((p) => privacySQLCondition(p, postsTable))),
@@ -509,7 +551,7 @@ function countersFiltersSQL(tokens, condition, field) {
   const result = [];
 
   for (const token of tokens) {
-    if (token instanceof Condition && token.condition === condition) {
+    if (isCondition(token, condition)) {
       result.push(intervalSQL(token, field));
     }
   }
@@ -546,7 +588,7 @@ function getFileTypes(tokens) {
   let negative = null;
 
   for (const token of tokens) {
-    if (!(token instanceof Condition) || token.condition !== 'has') {
+    if (!isCondition(token, 'has')) {
       continue;
     }
 
@@ -609,11 +651,7 @@ function fileTypesFiltersSQL(tokens, attTable) {
  */
 function orPostsFromMeState(tokens) {
   for (const token of tokens) {
-    if (
-      token instanceof Condition &&
-      token.condition === 'in-my' &&
-      token.args.some((a) => /discussion/.test(a))
-    ) {
+    if (isCondition(token, 'in-my') && token.args.some((a) => /discussion/.test(a))) {
       // ! (| posts-from:me) === & (!posts-from:me)
       return !token.exclude;
     }

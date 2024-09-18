@@ -4,6 +4,8 @@ import expect from 'unexpected';
 
 import cleanDB from '../../../dbCleaner';
 import { Post, User, dbAdapter, Comment } from '../../../../app/models';
+import { createUsers } from '../../helpers/users';
+import { createComment, createPost } from '../../helpers/posts-and-comments';
 
 describe('Search', () => {
   const posts = [];
@@ -793,6 +795,44 @@ describe('Search', () => {
     it('should throw error if prefix is too short', async () => {
       const test = dbAdapter.search('x*', { minPrefixLength: 2 });
       await expect(test, 'to be rejected with', 'Minimum prefix length is 2');
+    });
+  });
+
+  describe('The authorship operator', () => {
+    let luna, mars, venus;
+    let lunaPost, venusPost;
+
+    before(async () => {
+      await cleanDB($pg_database);
+
+      [luna, mars, venus] = await createUsers(['luna', 'mars', 'venus']);
+      // This post should not be found, even though it contains the word 'mars'
+      lunaPost = await createPost(luna, 'luna post for mars');
+      await createComment(mars, lunaPost, 'just a comment');
+
+      // This post should be found because it contains the Mars' comment with the word 'mars'
+      venusPost = await createPost(venus, 'venus post');
+      await createComment(mars, venusPost, 'mars comment');
+    });
+
+    it(`should find posts by the 'mars by:mars' query`, async () => {
+      const ids = await dbAdapter.search('mars by:mars');
+      await expect(ids, 'to equal', [venusPost.id]);
+    });
+
+    it(`should find posts by the 'in-comments:mars by:mars' query`, async () => {
+      const ids = await dbAdapter.search('in-comments:mars by:mars');
+      await expect(ids, 'to equal', [venusPost.id]);
+    });
+
+    it(`should find posts by the 'in-comments: mars by:mars' query`, async () => {
+      const ids = await dbAdapter.search('in-comments: mars by:mars');
+      await expect(ids, 'to equal', [venusPost.id]);
+    });
+
+    it(`should find both of the posts by the 'in-comments: by:mars' query`, async () => {
+      const ids = await dbAdapter.search('in-comments: by:mars');
+      await expect(ids, 'to equal', [venusPost.id, lunaPost.id]);
     });
   });
 });
