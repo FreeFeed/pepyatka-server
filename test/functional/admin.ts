@@ -20,11 +20,11 @@ import {
 
 import {
   type UserCtx,
-  createTestUsers,
   performJSONRequest,
   authHeaders,
   cmpBy,
   createUserAsync,
+  createTestUser,
 } from './functional_test_helper';
 
 const expect = unexpected.clone();
@@ -38,7 +38,8 @@ describe('Admin API', () => {
   let venus: UserCtx;
 
   before(async () => {
-    [luna, mars] = await createTestUsers(['luna', 'mars']);
+    luna = await createTestUser('luna');
+    mars = await createTestUser('mars');
     // Venus is created by Luna's invite
     const invitationCode = await luna.user.createInvitation({
       message: 'hi',
@@ -425,8 +426,7 @@ describe('Admin API', () => {
 
   describe('Users list and user info', () => {
     it(`should return list of all users ordered by createdAt`, async () => {
-      // Use the fact that intId is assigned sequentially
-      const sortedUsers = [luna, mars, venus].sort((a, b) => b.user.intId - a.user.intId);
+      const sortedUsers = [venus, mars, luna];
       const response = await performJSONRequest('GET', `/api/admin/users`, null, authHeaders(mars));
       await expect(response, 'to satisfy', {
         __httpCode: 200,
