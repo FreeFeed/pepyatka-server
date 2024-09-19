@@ -76,14 +76,16 @@ const searchTrait = (superClass) =>
       let postAuthors = namesToIds(getPostAuthorNames(parsedQuery), accountsMap);
 
       // Date
-      const commonDateSQL = orJoin([
-        dateFiltersSQL(parsedQuery, 'p.created_at', IN_ALL),
-        dateFiltersSQL(parsedQuery, 'c.created_at', IN_ALL),
+      const postsContentDateSQL = andJoin([
+        contendDateSQL(parsedQuery, 'p.created_at', IN_ALL),
+        contendDateSQL(parsedQuery, 'p.created_at', IN_POSTS),
       ]);
-      const postDateSQL = dateFiltersSQL(parsedQuery, 'p.created_at', IN_POSTS);
-      const commentDateSQL = dateFiltersSQL(parsedQuery, 'c.created_at', IN_COMMENTS);
+      const commentsContentDateSQL = andJoin([
+        contendDateSQL(parsedQuery, 'c.created_at', IN_ALL),
+        contendDateSQL(parsedQuery, 'c.created_at', IN_COMMENTS),
+      ]);
 
-      const dateSQL = andJoin([commonDateSQL, postDateSQL, commentDateSQL]);
+      const postsDateSQL = postDateFilterSQL(parsedQuery, 'p.created_at');
 
       // Files
       const fileTypesSQL = fileTypesFiltersSQL(parsedQuery, 'a');
@@ -134,21 +136,10 @@ const searchTrait = (superClass) =>
       const cLikesSQL = getClikesAuthorsSQL(parsedQuery, 'cl.user_id', accountsMap);
       const useCLikesTable = isNonTrivialSQL(cLikesSQL);
 
-      // Are we using the 'comments' table?
-      const useCommentsTable =
-        !!commentsOnlyTextQuery ||
-        !!commonTextQuery ||
-        !commentTextAuthors.isEverything() ||
-        !commonTextAuthors.isEverything() ||
-        useCLikesTable ||
-        useCommentCountersTable ||
-        isNonTrivialSQL(commonDateSQL) ||
-        isNonTrivialSQL(commentDateSQL);
-
       // Privacy restrictions for comments
       let commentsRestrictionSQL = 'true';
 
-      if (useCommentsTable) {
+      if (hasCommentTokens) {
         const notBannedSQLFabric = await this.notBannedActionsSQLFabric(viewerId);
         commentsRestrictionSQL = orJoin([
           'c.id is null',
@@ -207,7 +198,7 @@ const searchTrait = (superClass) =>
       const fromSQL = joinLines([
         `from posts p`,
         `join users u on p.user_id = u.uid`,
-        useCommentsTable && `left join comments c on c.post_id = p.uid`,
+        hasCommentTokens && `left join comments c on c.post_id = p.uid`,
         useCLikesTable && `left join comment_likes cl on cl.comment_id = c.id`,
         useFilesTable && `left join attachments a on a.post_id = p.uid`,
         usePostCountersTable && `join post_counters pc on pc.post_id = p.uid`,
@@ -216,7 +207,7 @@ const searchTrait = (superClass) =>
 
       const commonWhereSQL = andJoin([
         postsAuthorsFilterSQL,
-        dateSQL,
+        postsDateSQL,
         postsRestrictionsSQL,
         commentsRestrictionSQL,
         postCountersSQL,
@@ -225,8 +216,8 @@ const searchTrait = (superClass) =>
       ]);
 
       const [postsPartQuery, commentsPartQuery] = [
-        andJoin([postsPartTextSQL, postTextsAuthorsSQL]),
-        andJoin([commentsPartTextSQL, commentTextsAuthorsSQL]),
+        andJoin([postsPartTextSQL, postTextsAuthorsSQL, postsContentDateSQL]),
+        andJoin([commentsPartTextSQL, commentTextsAuthorsSQL, commentsContentDateSQL]),
       ].map((partSQL) =>
         // The selecting query is almost the same for both UNION's members, the
         // difference is only in the partSQL condition
@@ -252,7 +243,7 @@ const searchTrait = (superClass) =>
         joinLines(
           [
             (hasPostTokens || !hasCommentTokens) && postsPartQuery,
-            useCommentsTable && commentsPartQuery,
+            hasCommentTokens && commentsPartQuery,
           ],
           'union',
         ),
@@ -494,7 +485,19 @@ function getClikesAuthorsSQL(tokens, field, accountsMap) {
   return andJoin([positiveAgg && positiveAgg, negativeAgg && sqlNot(negativeAgg)]);
 }
 
-function dateFiltersSQL(tokens, field, targetScope) {
+function postDateFilterSQL(tokens, field) {
+  const result = [];
+
+  for (const token of tokens) {
+    if (isCondition(token, 'post-date')) {
+      result.push(intervalSQL(token, field));
+    }
+  }
+
+  return andJoin(result);
+}
+
+function contendDateSQL(tokens, field, targetScope) {
   const result = [];
   walkWithScope(tokens, (token, currentScope) => {
     if (
