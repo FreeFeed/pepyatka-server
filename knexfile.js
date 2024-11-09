@@ -1,4 +1,4 @@
-require('./esm/register.cjs');
+require('tsx/cjs');
 const { loadFileConfigs } = require('config').util;
 
 let env = process.env.NODE_ENV || 'development';
