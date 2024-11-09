@@ -178,5 +178,5 @@
   "resolutions": {
     "@types/node": "~18.19.4"
   },
-  "packageManager": "yarn@4.4.1"
+  "packageManager": "yarn@4.5.1"
 }
