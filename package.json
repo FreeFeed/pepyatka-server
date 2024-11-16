@@ -13,10 +13,11 @@
     "lint": "run-s eslint ejslint",
     "ejslint": "ejslint app",
     "eslint": "eslint . --ext \".js,.jsx,.ts\"",
-    "babel": "node -r './esm/register.cjs'",
+    "babel": "tsx",
+    "knex": "knex",
     "typecheck": "tsc",
-    "reset-test-db": "run-s \"babel bin/clean_test_db.js\" && knex --env test migrate:latest",
-    "test-rollback": "knex --env test migrate:rollback && knex --env test migrate:latest",
+    "reset-test-db": "run-s \"babel bin/clean_test_db.js\" \"knex --env test migrate:latest\"",
+    "test-rollback": "run-s \"knex --env test migrate:rollback\" \"knex --env test migrate:latest\"",
     "test-just": "cross-env NODE_ENV=test FRFS_SECRET=test-secret mocha",
     "mocha": "cross-env TZ=UTC run-s \"test-just -b test/unit test/integration test/functional test/cleanup.js\"",
     "console": "yarn babel bin/console",
@@ -146,7 +147,6 @@
     "chai-fs": "~2.0.0",
     "cross-env": "~7.0.3",
     "ejs-lint": "~2.0.0",
-    "esbuild": "~0.23.1",
     "eslint": "~8.56.0",
     "eslint-config-prettier": "~9.1.0",
     "eslint-plugin-babel": "~5.3.1",
@@ -167,6 +167,7 @@
     "socket.io-client-modern": "npm:socket.io-client@~4.7.5",
     "source-map-support": "~0.5.21",
     "superagent": "~10.1.0",
+    "tsx": "~4.19.2",
     "typescript": "~5.5.4",
     "unexpected": "~13.2.1",
     "unexpected-date": "~2.0.0",
@@ -178,5 +179,5 @@
   "resolutions": {
     "@types/node": "~18.19.4"
   },
-  "packageManager": "yarn@4.4.1"
+  "packageManager": "yarn@4.5.1"
 }
