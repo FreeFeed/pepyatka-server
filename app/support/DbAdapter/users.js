@@ -676,9 +676,10 @@ const usersTrait = (superClass) =>
     }
 
     sparseMatchesUserIds(query) {
+      query = query.toLowerCase();
       return this.database.getCol(
-        `select uid from users where username like :query and not is_private`,
-        { query: `%${query.split('').join('%')}%` },
+        `select uid from users where username like :sparseQuery and not is_private or username = :query`,
+        { sparseQuery: `%${query.split('').join('%')}%`, query },
       );
     }
   };
