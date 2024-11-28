@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.23.0] - Not released
+### Added
+- Allow to limit the number of simultaneous executions for some job types.
+
+  The JobManager now has a `limitedJobs` parameter of type `Record<string,
+  number>`, that defines the maximum number of simultaneous executions for each
+  job of given type (name). Other jobs, that are not listed in `limitedJobs` are
+  executed without limits.
 
 ## [2.22.5] - 2025-01-05
 ### Added

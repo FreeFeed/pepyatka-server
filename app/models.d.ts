@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { Config } from 'config';
 
 import { DbAdapter, type InvitationRecord } from './support/DbAdapter';
 import PubSubAdapter from './pubsub';
@@ -272,8 +273,11 @@ export type JobHandler<P> = (job: Job<P>) => Promise<unknown>;
 export type JobMiddleware = (h: JobHandler<unknown>) => JobHandler<unknown>;
 
 export class JobManager {
+  limitedJobs: Record<string, number>;
+  constructor(params?: Partial<Config['jobManager'] & { limitedJobs: Record<string, number> }>);
   on<P = unknown>(name: string, handler: JobHandler<P>): () => void;
-  fetchAndProcess(): Promise<Job>;
+  fetch(count?: number, lockTime?: number): Promise<Job[]>;
+  fetchAndProcess(count?: number, lockTime?: number): Promise<Job[]>;
   use(mw: JobMiddleware): void;
 }
 

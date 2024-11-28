@@ -87,20 +87,22 @@ export function addJobManagerModel(dbAdapter) {
     maxJobLockTime;
     jobLockTimeMultiplier;
     batchSize;
+    limitedJobs = {};
 
     _pollTimer = null;
     _handlers = new Map();
 
     /**
-     * @param {Partial<typeof config.jobManager>} [props]
+     * @param {Partial<typeof config.jobManager & {limitedJobs: Record<string, number>}>} [props]
      */
     constructor(props = {}) {
-      props = { ...config.jobManager, ...props };
+      props = { ...config.jobManager, limitedJobs: {}, ...props };
       this.pollInterval = props.pollInterval;
       this.jobLockTime = props.jobLockTime;
       this.maxJobLockTime = props.maxJobLockTime;
       this.jobLockTimeMultiplier = props.jobLockTimeMultiplier;
       this.batchSize = props.batchSize;
+      this.limitedJobs = props.limitedJobs;
     }
 
     /**
@@ -111,7 +113,7 @@ export function addJobManagerModel(dbAdapter) {
      * Handler can return some value which may be useful for other middlewares,
      * so the polite middleware should also return this value.
      *
-     * If middleware handles job exceptions, it shold re-throw them for the
+     * If middleware handles job exceptions, it should re-throw them for the
      * proper job error handling. "Eat" exception only if you intend to mark job
      * as successfully completed.
      *
@@ -146,9 +148,16 @@ export function addJobManagerModel(dbAdapter) {
       this._pollTimer = null;
     }
 
+    /**
+     * Fetch jobs from the queue.
+     *
+     * @param {number} count
+     * @param {number} lockTime
+     * @returns {Promise<Job[]>}
+     */
     async fetch(count = this.batchSize, lockTime = this.jobLockTime) {
       debugVerbose('fetching jobs');
-      const jobs = await dbAdapter.fetchJobs(count, lockTime);
+      const jobs = await dbAdapter.fetchJobs(count, lockTime, this.limitedJobs);
       debugVerbose(`${jobs.length} jobs found`);
       return jobs;
     }
@@ -159,6 +168,7 @@ export function addJobManagerModel(dbAdapter) {
      *
      * @param {number} count
      * @param {number} lockTime
+     * @returns {Promise<Job[]>}
      */
     async fetchAndProcess(count = this.batchSize, lockTime = this.jobLockTime) {
       const jobs = await this.fetch(count, lockTime);

@@ -339,7 +339,7 @@ export class DbAdapter {
   updateJob(id: UUID, params: { unlockAt?: Date | number; failure?: boolean | null }): Promise<Job>;
   getJobById(id: UUID): Promise<Nullable<Job>>;
   deleteJob(id: UUID): Promise<void>;
-  fetchJobs(count: number, lockTime: number): Promise<Job[]>;
+  fetchJobs(count: number, lockTime: number, limitedJobs?: Record<string, number>): Promise<Job[]>;
   getAllJobs(names?: string[]): Promise<Job[]>; // For testing purposes only
 
   // Group blocks
