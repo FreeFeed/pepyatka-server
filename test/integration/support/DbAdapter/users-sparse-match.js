@@ -39,7 +39,7 @@ describe('sparseMatchesUserIds', () => {
     expect(names, 'when sorted', 'to equal', ['antenna', 'uranus', 'saturn'].sort());
   });
 
-  describe('Lona goes private', () => {
+  describe('Luna goes private', () => {
     before(() => users.find((u) => u.username === 'luna').update({ isPrivate: '1' }));
     after(() =>
       users.find((u) => u.username === 'luna').update({ isPrivate: '0', isProtected: '0' }),
@@ -49,6 +49,12 @@ describe('sparseMatchesUserIds', () => {
       const ids = await dbAdapter.sparseMatchesUserIds('ua');
       const names = ids.map((id) => users.find((u) => u.id === id).username);
       expect(names, 'when sorted', 'to equal', ['uranus'].sort());
+    });
+
+    it('should find Luna using the exact query', async () => {
+      const ids = await dbAdapter.sparseMatchesUserIds('luna');
+      const names = ids.map((id) => users.find((u) => u.id === id).username);
+      expect(names, 'when sorted', 'to equal', ['luna'].sort());
     });
   });
 });
