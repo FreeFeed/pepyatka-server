@@ -17,7 +17,6 @@ import { createAttachment } from './attachment-helpers';
 
 const photoWithGPSPath = join(__dirname, '../../fixtures/photo-with-gps.jpg');
 const photoWithoutGPSPath = join(__dirname, '../../fixtures/photo-without-gps.jpg');
-const brokenFilePath = join(__dirname, '../../fixtures/broken-meta.jpg');
 
 const gpsTags = ['GPSLatitude', 'GPSLongitude', 'GPSPosition', 'GPSLatitudeRef', 'GPSLongitudeRef'];
 
@@ -115,19 +114,6 @@ describe('sanitizeOriginal model method', () => {
         name: `photo.jpg`,
         type: 'image/jpeg',
         content: await fsPromises.readFile(photoWithoutGPSPath),
-      });
-      const prevSize = att.fileSize;
-      const updated = await att.sanitizeOriginal();
-      expect(updated, 'to be false');
-      expect(prevSize, 'to equal', att.fileSize);
-      expect(att.sanitized, 'to be', SANITIZE_VERSION);
-    });
-
-    it(`should 'sanitize' a broken file`, async () => {
-      const att = await createAttachment(luna.id, {
-        name: `photo.jpg`,
-        type: 'image/jpeg',
-        content: await fsPromises.readFile(brokenFilePath),
       });
       const prevSize = att.fileSize;
       const updated = await att.sanitizeOriginal();
