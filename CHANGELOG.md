@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - Not released
+### Changed
+- The `GET /v2/users/sparseMatches?qs=...`  API endpoint now returns private
+  users and groups when the username _exactly matches_ the query string.
+### Fixed
+- Remove all the IFD1 metadata (the thumbnail) from the image after rotation.
+  When the thumbnail data is broken (it is possible on some smartphone images),
+  it prevents the updated image from being saved.
+
 ## [2.22.3] - 2024-09-19
 ### Fixed
 - The 'by:' and 'date:' search operators were not working properly, they are

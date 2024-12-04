@@ -1,5 +1,3 @@
-require('../esm/register.cjs');
-
 global.$database = require('../app/setup/database').default; // used by realtime-tests
 
 global.$should = require('chai').should();

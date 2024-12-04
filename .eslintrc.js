@@ -1,5 +1,3 @@
-require('./esm/register.cjs');
-
 module.exports = {
   extends: [
     'eslint:recommended',

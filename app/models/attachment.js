@@ -724,13 +724,17 @@ async function gmAutoOrientCommands(fileName) {
  * @returns {Promise<void>}
  */
 async function clearOrientation(fileName) {
-  const orientTags = ['IFD0:Orientation', 'IFD1:Orientation'];
+  const orientTags = ['IFD0:Orientation'];
   const imageTags = await exiftool.readRaw(fileName, [
     ...orientTags.map((t) => `-${t}`),
     '-G1',
     '-n',
   ]);
-  const tagsToClean = {};
+
+  const tagsToClean = {
+    // Always remove all IFD1 (preview) section
+    'IFD1:all': null,
+  };
 
   // We do not want to change images if it is not necessary, so we ignore tag
   // values of '1' (Normal).
