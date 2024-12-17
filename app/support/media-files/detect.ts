@@ -122,9 +122,9 @@ async function hasImageSignature(file: string): Promise<boolean> {
   const fh = await open(file, 'r');
 
   try {
-    const fileHead = new Uint8Array(16);
-    await fh.read(fileHead);
-    return checkImageSignature(fileHead);
+    const buffer = new Uint8Array(16);
+    await fh.read({ buffer });
+    return checkImageSignature(buffer);
   } finally {
     await fh.close();
   }
