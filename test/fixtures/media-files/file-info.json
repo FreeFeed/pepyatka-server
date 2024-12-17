@@ -1,0 +1,132 @@
+[
+  {
+    "file": "dodecahedron.gif",
+    "info": {
+      "type": "video",
+      "format": "gif",
+      "vCodec": "gif",
+      "width": 256,
+      "height": 256,
+      "duration": 7.6,
+      "isAnimatedImage": true
+    }
+  },
+  {
+    "file": "music.m4a",
+    "info": {
+      "type": "audio",
+      "format": "mov",
+      "aCodec": "aac",
+      "duration": 24,
+      "tags": {
+        "major_brand": "M4A ",
+        "minor_version": "512",
+        "compatible_brands": "isomiso2",
+        "encoder": "Lavf58.20.100"
+      }
+    }
+  },
+  {
+    "file": "music.mp3",
+    "info": {
+      "type": "audio",
+      "format": "mp3",
+      "aCodec": "mp3",
+      "duration": 24.032653,
+      "tags": {
+        "TIT3": "I have performed this improvisation with my plastic \"Sopranino\" recorder in my house in Rome, Italy, 5 October 2015. I recorded with a Tascam DR-05 and I added a bit reverb with Logic Pro X.",
+        "track": "1",
+        "album": "Wikimedia",
+        "artist": "Piermic",
+        "title": "Improvisation with Sopranino Recorder",
+        "date": "2015"
+      }
+    }
+  },
+  {
+    "file": "music.ogg",
+    "info": {
+      "type": "audio",
+      "format": "ogg",
+      "aCodec": "vorbis",
+      "duration": 24
+    }
+  },
+  {
+    "file": "music.wma",
+    "info": {
+      "type": "audio",
+      "format": "asf",
+      "aCodec": "wmav2",
+      "duration": 24.009,
+      "tags": { "encoder": "Lavf58.29.100" }
+    }
+  },
+  {
+    "file": "polyphon.mp4",
+    "info": {
+      "type": "video",
+      "format": "mov",
+      "vCodec": "h264",
+      "aCodec": "aac",
+      "width": 1280,
+      "height": 720,
+      "duration": 40.04,
+      "tags": {
+        "major_brand": "isom",
+        "minor_version": "512",
+        "compatible_brands": "isomiso2avc1mp41",
+        "encoder": "Lavf61.7.100"
+      }
+    }
+  },
+  {
+    "file": "polyphon.ogv",
+    "info": {
+      "type": "video",
+      "format": "ogg",
+      "vCodec": "theora",
+      "aCodec": "vorbis",
+      "width": 1280,
+      "height": 720,
+      "duration": 40.04
+    }
+  },
+  {
+    "file": "polyphon.wmv",
+    "info": {
+      "type": "video",
+      "format": "asf",
+      "vCodec": "wmv2",
+      "aCodec": "wmav2",
+      "width": 1280,
+      "height": 720,
+      "duration": 40.084,
+      "tags": { "encoder": "Lavf61.7.100" }
+    }
+  },
+  {
+    "file": "squirrel.avif",
+    "info": { "type": "image", "format": "avif", "width": 1920, "height": 1280 }
+  },
+  {
+    "file": "squirrel.gif",
+    "info": { "type": "image", "format": "gif", "width": 640, "height": 427 }
+  },
+  {
+    "file": "squirrel.heic",
+    "info": { "type": "image", "format": "heic", "width": 1920, "height": 1280 }
+  },
+  {
+    "file": "squirrel.jpg",
+    "info": { "type": "image", "format": "jpeg", "width": 1920, "height": 1280 }
+  },
+  {
+    "file": "squirrel.png",
+    "info": { "type": "image", "format": "png", "width": 640, "height": 427 }
+  },
+  {
+    "file": "squirrel.webp",
+    "info": { "type": "image", "format": "webp", "width": 1920, "height": 1280 }
+  }
+]

@@ -121,6 +121,7 @@
     "@types/bytes": "~3.1.4",
     "@types/cache-manager": "~4.0.6",
     "@types/debug": "~4.1.12",
+    "@types/gm": "~1.25.4",
     "@types/humps": "~2.0.6",
     "@types/jsonwebtoken": "~9.0.6",
     "@types/koa": "~2.15.0",

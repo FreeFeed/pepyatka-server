@@ -2228,6 +2228,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/gm@npm:~1.25.4":
+  version: 1.25.4
+  resolution: "@types/gm@npm:1.25.4"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10c0/ed95afc430d082a76b35b7677bc876a7eec32a9b991187474d841c54fc907828bb9277d1638abc3d78d2b6a05400f269d214bb0a6ace67687fe89042f3c32131
+  languageName: node
+  linkType: hard
+
 "@types/http-assert@npm:*":
   version: 1.5.5
   resolution: "@types/http-assert@npm:1.5.5"
@@ -6149,6 +6158,7 @@ __metadata:
     "@types/bytes": "npm:~3.1.4"
     "@types/cache-manager": "npm:~4.0.6"
     "@types/debug": "npm:~4.1.12"
+    "@types/gm": "npm:~1.25.4"
     "@types/humps": "npm:~2.0.6"
     "@types/jsonwebtoken": "npm:~9.0.6"
     "@types/koa": "npm:~2.15.0"
