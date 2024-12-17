@@ -128,5 +128,13 @@
   {
     "file": "squirrel.webp",
     "info": { "type": "image", "format": "webp", "width": 1920, "height": 1280 }
+  },
+  {
+    "file": "squirrel.tiff",
+    "info": { "type": "general" }
+  },
+  {
+    "file": "fake-gif.txt",
+    "info": { "type": "general" }
   }
 ]
