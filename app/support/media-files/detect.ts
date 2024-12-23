@@ -1,13 +1,13 @@
 import util from 'util';
 import { open } from 'fs/promises';
 
-import gm from 'gm';
+import gmLib from 'gm';
 
 import { spawnAsync } from '../spawn-async';
 
 import { FfprobeResult, MediaInfo, MediaInfoVideo } from './types';
 
-const im = gm.subClass({ imageMagick: true });
+const gm = gmLib.subClass({ imageMagick: true });
 
 export async function detectMediaType(file: string): Promise<MediaInfo> {
   // Check by file signature
@@ -15,7 +15,7 @@ export async function detectMediaType(file: string): Promise<MediaInfo> {
 
   if (probablyImage) {
     // Identify using ImageMagick
-    const image = im(file);
+    const image = gm(file);
     const identifyAsync = util.promisify<string, string>(image.identify);
 
     try {

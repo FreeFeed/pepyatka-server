@@ -6,7 +6,7 @@ import os from 'os';
 
 import config from 'config';
 import createDebug from 'debug';
-import gm from 'gm';
+import gmLib from 'gm';
 import mime from 'mime-types';
 import mmm from 'mmmagic';
 import _ from 'lodash';
@@ -18,6 +18,8 @@ import { exiftool } from 'exiftool-vendored';
 
 import { getS3 } from '../support/s3';
 import { sanitizeMediaMetadata, SANITIZE_NONE, SANITIZE_VERSION } from '../support/sanitize-media';
+
+const gm = gmLib.subClass({ imageMagick: true });
 
 const mvAsync = util.promisify(mv);
 

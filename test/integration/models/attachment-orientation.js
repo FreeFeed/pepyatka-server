@@ -5,12 +5,14 @@ import { mkdtemp, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { basename, join } from 'path';
 
-import gm from 'gm';
+import gmLib from 'gm';
 import { exiftool } from 'exiftool-vendored';
 import expect from 'unexpected';
 
 import cleanDB from '../../dbCleaner';
 import { User, Attachment } from '../../../app/models';
+
+const gm = gmLib.subClass({ imageMagick: true });
 
 const orientationNames = [
   'Unknown', // No orientation tag

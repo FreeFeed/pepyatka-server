@@ -5,7 +5,7 @@ import path from 'path';
 import util from 'util';
 
 import { mkdirp } from 'mkdirp';
-import gm from 'gm';
+import gmLib from 'gm';
 import { expect, use as chaiUse } from 'chai';
 import chaiFS from 'chai-fs';
 import _ from 'lodash';
@@ -16,6 +16,8 @@ import { dbAdapter, User, Attachment } from '../../../app/models';
 import { filesMustExist } from '../helpers/attachments';
 
 import { fakeS3 } from './fake-s3';
+
+const gm = gmLib.subClass({ imageMagick: true });
 
 chaiUse(chaiFS);
 
@@ -404,7 +406,7 @@ describe('Attachment', () => {
         const original = gm(newAttachment.getPath());
         original.toBufferAsync = util.promisify(original.toBuffer);
 
-        const buffer = await original.resize(1, 1).toBufferAsync('RGB');
+        const buffer = await original.resize(1, 1).bitdepth(8).toBufferAsync('RGB');
 
         buffer.length.should.be.equal(3);
         buffer[0].should.be.within(191, 193);
@@ -420,7 +422,7 @@ describe('Attachment', () => {
         const thumbnail = gm(thumbnailFile);
         thumbnail.toBufferAsync = util.promisify(thumbnail.toBuffer);
 
-        const buffer = await thumbnail.resize(1, 1).toBufferAsync('RGB');
+        const buffer = await thumbnail.resize(1, 1).bitdepth(8).toBufferAsync('RGB');
 
         buffer.length.should.be.equal(3);
         buffer[0].should.be.within(253, 255);

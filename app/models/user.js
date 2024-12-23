@@ -3,7 +3,7 @@ import { promises as fs, createReadStream } from 'fs';
 import util from 'util';
 
 import bcrypt from 'bcrypt';
-import gm from 'gm';
+import gmLib from 'gm';
 import GraphemeBreaker from 'grapheme-breaker';
 import _ from 'lodash';
 import monitor from 'monitor-dog';
@@ -19,6 +19,8 @@ import { userCooldownStart, userDataDeletionStart } from '../jobs/user-gone';
 import { allExternalProviders } from '../support/ExtAuth';
 
 import { validate as validateUserPrefs } from './user-prefs';
+
+const gm = gmLib.subClass({ imageMagick: true });
 
 const randomBytes = util.promisify(crypto.randomBytes);
 
