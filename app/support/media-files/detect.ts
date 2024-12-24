@@ -6,16 +6,20 @@ import gmLib from 'gm';
 import { spawnAsync } from '../spawn-async';
 
 import { FfprobeResult, MediaInfo, MediaInfoVideo } from './types';
+import { addFileExtension } from './file-ext';
 
 const gm = gmLib.subClass({ imageMagick: true });
 
-export async function detectMediaType(file: string): Promise<MediaInfo> {
+export async function detectMediaType(
+  localFilePath: string,
+  origFileName: string,
+): Promise<MediaInfo> {
   // Check by file signature
-  const probablyImage = await hasImageSignature(file);
+  const probablyImage = await hasImageSignature(localFilePath);
 
   if (probablyImage) {
     // Identify using ImageMagick
-    const image = gm(file);
+    const image = gm(localFilePath);
     const identifyAsync = util.promisify<string, string>(image.identify);
 
     try {
@@ -25,60 +29,71 @@ export async function detectMediaType(file: string): Promise<MediaInfo> {
 
       // Animated images? Only GIF is supported for now
       if (fmt === 'gif') {
-        const data = await detectAnimatedImage(file);
+        const data = await detectAnimatedImage(localFilePath);
 
         if (data) {
-          return { ...data, isAnimatedImage: true };
+          return addFileExtension(data, origFileName);
         }
       }
 
-      return {
-        type: 'image',
-        format: fmt,
-        width: parseInt(parts[1], 10),
-        height: parseInt(parts[2], 10),
-      };
+      return addFileExtension(
+        {
+          type: 'image',
+          format: fmt,
+          width: parseInt(parts[1], 10),
+          height: parseInt(parts[2], 10),
+        },
+        origFileName,
+      );
     } catch {
-      return { type: 'general' };
+      return addFileExtension({ type: 'general' }, origFileName);
     }
   }
 
   // Identify other types using ffprobe
   try {
-    const { format, streams } = await runFfprobe(file);
+    const { format, streams } = await runFfprobe(localFilePath);
     const fmt = format.format_name.split(',')[0].toLowerCase();
 
     const videoStream = streams.find((s) => s.codec_type === 'video');
     const audioStream = streams.find((s) => s.codec_type === 'audio');
 
     if (videoStream && format.duration) {
-      return {
-        type: 'video',
-        format: fmt,
-        vCodec: videoStream.codec_name,
-        aCodec: audioStream?.codec_name,
-        duration: parseFloat(format.duration),
-        width: videoStream.width!,
-        height: videoStream.height!,
-        tags: format.tags,
-      };
+      return addFileExtension(
+        {
+          type: 'video',
+          format: fmt,
+          vCodec: videoStream.codec_name,
+          aCodec: audioStream?.codec_name,
+          duration: parseFloat(format.duration),
+          width: videoStream.width!,
+          height: videoStream.height!,
+          tags: format.tags,
+        },
+        origFileName,
+      );
     } else if (audioStream && format.duration) {
-      return {
-        type: 'audio',
-        format: fmt,
-        aCodec: audioStream.codec_name,
-        duration: parseFloat(format.duration),
-        tags: format.tags,
-      };
+      return addFileExtension(
+        {
+          type: 'audio',
+          format: fmt,
+          aCodec: audioStream.codec_name,
+          duration: parseFloat(format.duration),
+          tags: format.tags,
+        },
+        origFileName,
+      );
     }
 
-    return { type: 'general' };
+    return addFileExtension({ type: 'general' }, origFileName);
   } catch {
-    return { type: 'general' };
+    return addFileExtension({ type: 'general' }, origFileName);
   }
 }
 
-async function detectAnimatedImage(file: string): Promise<MediaInfoVideo | null> {
+async function detectAnimatedImage(
+  file: string,
+): Promise<Omit<MediaInfoVideo, 'extension'> | null> {
   const { format, streams } = await runFfprobe(file);
   const fmt = format.format_name.split(',')[0].toLowerCase();
 
@@ -97,6 +112,7 @@ async function detectAnimatedImage(file: string): Promise<MediaInfoVideo | null>
       width: videoStream.width!,
       height: videoStream.height!,
       duration: parseFloat(format.duration),
+      isAnimatedImage: true,
     };
   }
 

@@ -1,3 +1,5 @@
+export type MediaType = 'image' | 'video' | 'audio' | 'general';
+
 export type MediaInfoVisual = {
   width: number;
   height: number;
@@ -8,6 +10,7 @@ export type MediaInfoPlayable = {
 };
 
 export type MediaInfoCommon = {
+  extension: string;
   tags?: Record<string, string>;
 };
 

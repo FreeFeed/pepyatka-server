@@ -17,7 +17,7 @@ describe('Media files', () => {
       console.log(`Running test for ${fileName}`);
 
       // eslint-disable-next-line no-await-in-loop
-      const detected = await detectMediaType(join(samplesDir, fileName));
+      const detected = await detectMediaType(join(samplesDir, fileName), fileName);
       expect(info, 'to equal', detected);
     }
   });

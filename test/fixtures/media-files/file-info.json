@@ -8,7 +8,8 @@
       "width": 256,
       "height": 256,
       "duration": 7.6,
-      "isAnimatedImage": true
+      "isAnimatedImage": true,
+      "extension": "gif"
     }
   },
   {
@@ -23,7 +24,8 @@
         "minor_version": "512",
         "compatible_brands": "isomiso2",
         "encoder": "Lavf58.20.100"
-      }
+      },
+      "extension": "m4a"
     }
   },
   {
@@ -40,7 +42,8 @@
         "artist": "Piermic",
         "title": "Improvisation with Sopranino Recorder",
         "date": "2015"
-      }
+      },
+      "extension": "mp3"
     }
   },
   {
@@ -49,7 +52,8 @@
       "type": "audio",
       "format": "ogg",
       "aCodec": "vorbis",
-      "duration": 24
+      "duration": 24,
+      "extension": "ogg"
     }
   },
   {
@@ -59,7 +63,8 @@
       "format": "asf",
       "aCodec": "wmav2",
       "duration": 24.009,
-      "tags": { "encoder": "Lavf58.29.100" }
+      "tags": { "encoder": "Lavf58.29.100" },
+      "extension": "wma"
     }
   },
   {
@@ -77,7 +82,8 @@
         "minor_version": "512",
         "compatible_brands": "isomiso2avc1mp41",
         "encoder": "Lavf61.7.100"
-      }
+      },
+      "extension": "mp4"
     }
   },
   {
@@ -89,7 +95,8 @@
       "aCodec": "vorbis",
       "width": 1280,
       "height": 720,
-      "duration": 40.04
+      "duration": 40.04,
+      "extension": "ogv"
     }
   },
   {
@@ -102,39 +109,41 @@
       "width": 1280,
       "height": 720,
       "duration": 40.084,
-      "tags": { "encoder": "Lavf61.7.100" }
+      "tags": { "encoder": "Lavf61.7.100" },
+      "extension": "wmv"
+      
     }
   },
   {
     "file": "squirrel.avif",
-    "info": { "type": "image", "format": "avif", "width": 1920, "height": 1280 }
+    "info": { "type": "image", "format": "avif", "width": 1920, "height": 1280, "extension": "avif" }
   },
   {
     "file": "squirrel.gif",
-    "info": { "type": "image", "format": "gif", "width": 640, "height": 427 }
+    "info": { "type": "image", "format": "gif", "width": 640, "height": 427, "extension": "gif" }
   },
   {
     "file": "squirrel.heic",
-    "info": { "type": "image", "format": "heic", "width": 1920, "height": 1280 }
+    "info": { "type": "image", "format": "heic", "width": 1920, "height": 1280, "extension": "heic" }
   },
   {
     "file": "squirrel.jpg",
-    "info": { "type": "image", "format": "jpeg", "width": 1920, "height": 1280 }
+    "info": { "type": "image", "format": "jpeg", "width": 1920, "height": 1280, "extension": "jpg" }
   },
   {
     "file": "squirrel.png",
-    "info": { "type": "image", "format": "png", "width": 640, "height": 427 }
+    "info": { "type": "image", "format": "png", "width": 640, "height": 427, "extension": "png" }
   },
   {
     "file": "squirrel.webp",
-    "info": { "type": "image", "format": "webp", "width": 1920, "height": 1280 }
+    "info": { "type": "image", "format": "webp", "width": 1920, "height": 1280, "extension": "webp" }
   },
   {
     "file": "squirrel.tiff",
-    "info": { "type": "general" }
+    "info": { "type": "general", "extension": "tiff" }
   },
   {
     "file": "fake-gif.txt",
-    "info": { "type": "general" }
+    "info": { "type": "general", "extension": "txt" }
   }
 ]
