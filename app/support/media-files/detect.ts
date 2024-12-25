@@ -23,12 +23,20 @@ export async function detectMediaType(
     const identifyAsync = util.promisify<string, string>(image.identify);
 
     try {
-      const info = await identifyAsync.call(image, '%m %w %h');
+      const info = await identifyAsync.call(image, '%m %w %h %[orientation]');
       const parts = info.split(' ');
-      const fmt = parts[0].toLowerCase();
+      const format = parts[0].toLowerCase();
+
+      let width = parseInt(parts[1], 10);
+      let height = parseInt(parts[2], 10);
+
+      // Fix orientation
+      if (['LeftTop', 'RightTop', 'RightBottom', 'LeftBottom'].includes(parts[3])) {
+        [width, height] = [height, width];
+      }
 
       // Animated images? Only GIF is supported for now
-      if (fmt === 'gif') {
+      if (format === 'gif') {
         const data = await detectAnimatedImage(localFilePath);
 
         if (data) {
@@ -39,9 +47,9 @@ export async function detectMediaType(
       return addFileExtension(
         {
           type: 'image',
-          format: fmt,
-          width: parseInt(parts[1], 10),
-          height: parseInt(parts[2], 10),
+          format,
+          width,
+          height,
         },
         origFileName,
       );
@@ -59,6 +67,18 @@ export async function detectMediaType(
     const audioStream = streams.find((s) => s.codec_type === 'audio');
 
     if (videoStream && format.duration) {
+      let width = videoStream.width!;
+      let height = videoStream.height!;
+
+      // If video has rotation, swap width and height
+      if (videoStream.side_data_list) {
+        const rotation = videoStream.side_data_list.find((s) => 'rotation' in s)?.rotation ?? '0';
+
+        if (rotation === '90' || rotation === '270' || rotation === '-90' || rotation === '-270') {
+          [width, height] = [height, width];
+        }
+      }
+
       return addFileExtension(
         {
           type: 'video',
@@ -66,8 +86,8 @@ export async function detectMediaType(
           vCodec: videoStream.codec_name,
           aCodec: audioStream?.codec_name,
           duration: parseFloat(format.duration),
-          width: videoStream.width!,
-          height: videoStream.height!,
+          width,
+          height,
           tags: format.tags,
         },
         origFileName,

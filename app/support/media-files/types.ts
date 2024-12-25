@@ -49,6 +49,7 @@ export type Stream = { codec_name: string } & (
       width: number;
       height: number;
       nb_frames: string;
+      side_data_list?: Record<string, string>[];
     }
   | {
       codec_type: 'audio';
