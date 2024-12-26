@@ -1,0 +1,83 @@
+import config from 'config';
+
+import { Box } from './types';
+
+export function getImagePreviewSizes(
+  info: Box,
+  { imagePreviewAreas, legacyImagePreviewSizes } = config.attachments.previews,
+): ({ variant: string } & Box)[] {
+  const previews: { [variant: string]: Box } = {};
+
+  // Modern preview sizes, area-based
+  const presets = [...Object.entries(imagePreviewAreas)];
+  presets.sort((a, b) => b[1] - a[1]); // Sort by descending area
+
+  const imageArea = info.width * info.height;
+
+  for (const [variant, area] of presets) {
+    if (imageArea >= area) {
+      previews[variant] = fitIntoArea(info, area);
+    }
+  }
+
+  // If the image area is larger than any of preset sizes
+  if (imageArea > presets[0][1]) {
+    const [[variant, size]] = presets;
+
+    // If image is slightly bigger than the largest preset, use the image size
+    if (imageArea < size * 1.5) {
+      previews[variant] = fitIntoArea(info, imageArea);
+    }
+  } else {
+    // Find the preset with the closest size, and use image size for it
+    let dist = Infinity;
+    let matched = null;
+
+    for (const [variant, area] of presets) {
+      const d = Math.abs(Math.log(imageArea / area));
+
+      if (d < dist) {
+        dist = d;
+        matched = variant;
+      }
+    }
+
+    if (matched) {
+      previews[matched] = fitIntoArea(info, imageArea);
+    }
+  }
+
+  // Legacy preview sizes
+  for (const [variant, sizes] of Object.entries(legacyImagePreviewSizes)) {
+    if (info.width >= sizes.width || info.height >= sizes.height) {
+      previews[variant] = fitIntoBox(info, sizes);
+    }
+  }
+
+  const result = [...Object.entries(previews)].map(([variant, size]) => ({ variant, ...size }));
+  // Sort by descending size
+  result.sort((a, b) => b.width - a.width);
+
+  return result;
+}
+
+function fitIntoArea({ width, height }: Box, area: number): Box {
+  if (width * height > area) {
+    const ratio = Math.sqrt(area / (width * height));
+
+    return { width: Math.round(width * ratio), height: Math.round(height * ratio) };
+  }
+
+  return { width, height };
+}
+
+function fitIntoBox({ width, height }: Box, { width: boxWidth, height: boxHeight }: Box): Box {
+  const wRatio = width / boxWidth;
+  const hRatio = height / boxHeight;
+
+  if (wRatio > hRatio) {
+    return { width: boxWidth, height: Math.round(height / wRatio) };
+  }
+
+  return { width: Math.round(width / hRatio), height: boxHeight };
+}

@@ -60,3 +60,16 @@ export type FfprobeResult = {
   format: { format_name: string; duration: string; tags?: Record<string, string> };
   streams: Stream[];
 };
+
+export type Box = {
+  width: number;
+  height: number;
+};
+
+export type ImageGeneratedPreview = {
+  variant: string;
+  width: number;
+  height: number;
+  extension: string;
+  path: string;
+};

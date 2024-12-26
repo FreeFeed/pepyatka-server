@@ -42,6 +42,7 @@ declare module 'config' {
         ignoreTags: RegExp[];
       };
       useImgProxy: boolean;
+      previews: PreviewsConfiguration;
     };
     maintenance: {
       messageFile: string;
@@ -206,6 +207,16 @@ declare module 'config' {
   export type TranslationLimits = {
     totalCharactersPerMonth: number;
     userCharactersPerDay: number;
+  };
+
+  export type PreviewsConfiguration = {
+    imagePreviewAreas: { [k: string]: number };
+    legacyImagePreviewSizes: {
+      [k: string]: {
+        width: number;
+        height: number;
+      };
+    };
   };
 
   const c: Config;

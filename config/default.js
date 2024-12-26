@@ -178,6 +178,18 @@ config.attachments = {
   },
   // Use https://imgproxy.net/ to dynamically create image thumbnails
   useImgProxy: false,
+  previews: {
+    imagePreviewAreas: {
+      p1: 120_000,
+      p2: 400_000,
+      p3: 1_200_000,
+      p4: 4_000_000,
+    },
+    legacyImagePreviewSizes: {
+      thumbnails: { width: 525, height: 175 },
+      thumbnails2: { width: 1050, height: 350 },
+    },
+  },
 };
 config.profilePictures = {
   defaultProfilePictureMediumUrl: 'http://placekitten.com/50/50',
