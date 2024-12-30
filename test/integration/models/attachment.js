@@ -1,557 +1,373 @@
-/* eslint-env node, mocha */
-/* global $pg_database */
-import { promises as fsPromises } from 'fs';
-import path from 'path';
-import util from 'util';
+import { readFile, stat, writeFile } from 'fs/promises';
+import { join, resolve, parse as parsePath, basename, extname } from 'path';
+import { tmpdir } from 'os';
 
+import { v4 as createUuid } from 'uuid';
+import { before, beforeEach, describe, it } from 'mocha';
+import expect from 'unexpected';
 import { mkdirp } from 'mkdirp';
-import gmLib from 'gm';
-import { expect, use as chaiUse } from 'chai';
-import chaiFS from 'chai-fs';
-import _ from 'lodash';
-import config from 'config';
+import { lookup as mimeLookup } from 'mime-types';
 
 import cleanDB from '../../dbCleaner';
-import { dbAdapter, User, Attachment } from '../../../app/models';
-import { filesMustExist } from '../helpers/attachments';
+import { dbAdapter, Attachment } from '../../../app/models';
+import { currentConfig } from '../../../app/support/app-async-context';
+import { createUser } from '../helpers/users';
+import { createPost } from '../helpers/posts-and-comments';
+import { spawnAsync } from '../../../app/support/spawn-async';
+import { withModifiedConfig } from '../../helpers/with-modified-config';
 
-import { fakeS3 } from './fake-s3';
+import { FakeS3 } from './fake-s3';
+import { testFiles } from './attachment-data';
 
-const gm = gmLib.subClass({ imageMagick: true });
+const fixturesDir = resolve(__dirname, '../../fixtures');
 
-chaiUse(chaiFS);
+const fakeS3 = new FakeS3();
 
-const { readFile, writeFile, stat } = fsPromises;
+describe('Attachments', () => {
+  before(() => cleanDB(dbAdapter.database));
 
-describe('Attachment', () => {
-  before(() => cleanDB($pg_database));
+  let user;
+  before(async () => {
+    // Create user
+    user = await createUser('luna');
 
-  describe('#create()', () => {
-    let user;
-    let post;
+    const attConf = currentConfig().attachments;
 
-    // FormData file objects
-    const files = {
-      small: {
-        size: 708,
-        path: '/tmp/upload_12345678901234567890123456789012_1',
-        name: 'test-image.150x150.png',
-        type: 'image/png',
+    // Create directories for attachments
+    await mkdirp(attConf.storage.rootDir + attConf.path);
+
+    const variants = [
+      ...Object.keys(attConf.previews.imagePreviewAreas),
+      ...Object.keys(attConf.previews.legacyImagePreviewSizes),
+      ...attConf.previews.nonVisualPreviewTypes,
+    ];
+
+    await Promise.all(
+      variants.map((variant) => mkdirp(attConf.storage.rootDir + attConf.path + variant)),
+    );
+  });
+
+  beforeEach(() => fakeS3.clear());
+
+  let post;
+
+  beforeEach(async () => {
+    post = await createPost(user, 'Post body');
+  });
+
+  it('should create a small attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.small, post, user);
+    expect(att.previews, 'to equal', {
+      image: { '': { h: 150, w: 150, ext: 'png' } },
+    });
+  });
+
+  it('should create a medium attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.medium, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        '': { h: 300, w: 900, ext: 'png' },
+        p1: { h: 200, w: 600, ext: 'webp' },
+        thumbnails: { h: 175, w: 525, ext: 'webp' },
       },
-      medium: {
-        size: 1469,
-        path: '/tmp/upload_12345678901234567890123456789012_2',
-        name: 'test-image.900x300.png',
-        type: 'image/png',
+    });
+  });
+
+  it('should create a large attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.large, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        '': { h: 1000, w: 1500, ext: 'png' },
+        p1: { h: 283, w: 424, ext: 'webp' },
+        p2: { h: 516, w: 775, ext: 'webp' },
+        thumbnails: { h: 175, w: 263, ext: 'webp' },
+        thumbnails2: { h: 350, w: 525, ext: 'webp' },
       },
-      large: {
-        size: 3199,
-        path: '/tmp/upload_12345678901234567890123456789012_3',
-        name: 'test-image.1500x1000.png',
-        type: 'image/png',
+    });
+  });
+
+  it('should create an x-large attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.xlarge, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        p1: { h: 283, w: 424, ext: 'webp' },
+        p2: { h: 516, w: 775, ext: 'webp' },
+        p3: { h: 894, w: 1342, ext: 'webp' },
+        p4: { h: 1633, w: 2449, ext: 'webp' }, // Maximum size, no entry for the original
+        thumbnails: { h: 175, w: 263, ext: 'webp' },
+        thumbnails2: { h: 350, w: 525, ext: 'webp' },
       },
-      xlarge: {
-        size: 11639,
-        path: '/tmp/upload_12345678901234567890123456789012_4',
-        name: 'test-image.3000x2000.png',
-        type: 'image/png',
+    });
+  });
+
+  it('should create a medium attachment with exif rotation', async () => {
+    const att = await createAndCheckAttachment(testFiles.rotated, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        '': { h: 900, w: 300, ext: 'jpg' },
+        p1: { h: 600, w: 200, ext: 'webp' },
+        thumbnails: { h: 175, w: 58, ext: 'webp' },
+        thumbnails2: { h: 350, w: 117, ext: 'webp' },
       },
-      rotated: {
-        size: -1, // do not test
-        path: '/tmp/upload_12345678901234567890123456789012_5',
-        name: 'test-image-exif-rotated.900x300.jpg',
-        type: 'image/jpeg',
+    });
+  });
+
+  it('should create a proper colored preview from non-sRGB original', async () => {
+    const att = await createAndCheckAttachment(testFiles.colorprofiled, post, user);
+    const { rootDir } = currentConfig().attachments.storage;
+
+    // original colors
+    {
+      const originalFile = join(rootDir, att.getRelFilePath('', att.fileExtension));
+      const { stdout: buffer } = await spawnAsync(
+        'convert',
+        [originalFile, '-resize', '1x1!', '-colorspace', 'sRGB', '-depth', '8', 'rgb:-'],
+        { binary: true },
+      );
+
+      expect(buffer, 'to have length', 3);
+      expect(buffer[0], 'to be within', 191, 193);
+      expect(buffer[1], 'to be within', 253, 255);
+      expect(buffer[2], 'to be within', 127, 129);
+    }
+
+    // preview colors
+    {
+      const previewFile = join(rootDir, att.getRelFilePath('p1', 'webp'));
+      const { stdout: buffer } = await spawnAsync(
+        'convert',
+        [previewFile, '-resize', '1x1!', '-colorspace', 'sRGB', '-depth', '8', 'rgb:-'],
+        { binary: true },
+      );
+
+      expect(buffer, 'to have length', 3);
+      expect(buffer[0], 'to be within', 253, 255);
+      expect(buffer[1], 'to be within', 191, 193);
+      expect(buffer[2], 'to be within', 127, 129);
+    }
+  });
+
+  it('should create a webp attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.webp, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        '': { h: 301, w: 400, ext: 'webp' },
+        thumbnails: { h: 175, w: 233, ext: 'webp' },
       },
-      colorprofiled: {
-        size: 16698,
-        path: '/tmp/upload_12345678901234567890123456789012_6',
-        name: 'test-image-sgrb.png',
-        type: 'image/png',
+    });
+  });
+
+  it('should create a heic attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.imageHeic, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        p1: { h: 283, w: 424, ext: 'webp' },
+        p2: { h: 516, w: 775, ext: 'webp' },
+        p3: { h: 894, w: 1342, ext: 'webp' },
+        p4: { h: 1280, w: 1920, ext: 'webp' },
+        thumbnails: { h: 175, w: 263, ext: 'webp' },
+        thumbnails2: { h: 350, w: 525, ext: 'webp' },
       },
-      animated: {
-        size: 128467,
-        path: '/tmp/upload_12345678901234567890123456789012_7',
-        name: 'test-image-animated.gif',
-        type: 'image/gif',
-      },
+    });
+  });
+
+  it('should create an MP3 audio attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.audioMp3, post, user);
+    expect(att.mimeType, 'to equal', testFiles.audioMp3.type);
+    expect(att.previews, 'to equal', {
       audio: {
-        size: 16836,
-        path: '/tmp/upload_12345678901234567890123456789012_8',
-        name: 'sample.mp3',
-        type: 'audio/mpeg',
+        '': { ext: 'mp3' },
       },
-      unknown: {
-        size: 16836,
-        path: '/tmp/upload_12345678901234567890123456789012_9',
-        name: 'sample',
-        type: 'audio/mpeg',
+    });
+    // TODO check music metadata
+  });
+
+  it('should create an M4A audio attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.audioM4a, post, user);
+    expect(att.mimeType, 'to equal', testFiles.audioM4a.type);
+    expect(att.previews, 'to equal', {
+      audio: {
+        '': { ext: 'm4a' },
       },
-      webp: {
-        size: 18840,
-        path: '/tmp/upload_12345678901234567890123456789012_10',
-        name: 'test-image-webp.webp',
-        type: 'image/webp',
-        changeableExtension: true,
+    });
+  });
+
+  it('should create an OGG audio attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.audioOgg, post, user);
+    expect(att.mimeType, 'to equal', testFiles.audioOgg.type);
+    expect(att.previews, 'to equal', {
+      audio: {
+        a1: { ext: 'm4a' },
       },
-      mov: {
-        size: 589371,
-        path: '/tmp/upload_12345678901234567890123456789012_11',
-        name: 'test-quicktime-video.mov',
-        type: 'video/quicktime',
+    });
+  });
+
+  it('should create an audio attachment from audio file without extension', async () => {
+    const att = await createAndCheckAttachment(testFiles.unknown, post, user);
+    expect(att.mimeType, 'to equal', testFiles.unknown.type);
+    expect(att.previews, 'to equal', {
+      audio: {
+        '': { ext: 'mp3' },
       },
-    };
-
-    const createAndCheckAttachment = async (file, thePost, theUser, useS3 = false) => {
-      const attachment = new Attachment({
-        file,
-        postId: thePost.id,
-        userId: theUser.id,
-      });
-
-      const s3Uploads = {};
-      const s3Deletes = {};
-
-      if (useS3) {
-        attachment.s3 = fakeS3({
-          onUpload: (params) => {
-            s3Uploads[params.Key] = params;
-          },
-          onDelete: (params) => {
-            s3Deletes[params.Key] = params;
-          },
-        });
-        attachment.s3bucket = 'bucket-name';
-      }
-
-      await attachment.create();
-
-      attachment.should.be.an.instanceOf(Attachment);
-      attachment.should.not.be.empty;
-      attachment.should.have.property('id');
-
-      const newAttachment = await dbAdapter.getAttachmentById(attachment.id);
-      newAttachment.s3 = attachment.s3;
-      newAttachment.s3bucket = attachment.s3bucket;
-
-      newAttachment.should.be.an.instanceOf(Attachment);
-      newAttachment.should.not.be.empty;
-      newAttachment.should.have.property('id');
-      newAttachment.id.should.eql(attachment.id);
-
-      newAttachment.should.have.a.property('mediaType');
-      expect(['image', 'audio', 'general']).to.include(newAttachment.mediaType);
-
-      newAttachment.should.have.a.property('fileName');
-      newAttachment.fileName.should.be.equal(file.name);
-
-      newAttachment.should.have.a.property('fileSize');
-      newAttachment.fileSize.should.be.equal(file.size.toString());
-
-      newAttachment.should.have.a.property('mimeType');
-      newAttachment.mimeType.should.be.equal(file.type);
-
-      newAttachment.should.have.a.property('fileExtension');
-
-      // Non-whitelisted file types are saved to FS without an extension
-      const optionalExtension = newAttachment.fileExtension
-        ? `.${newAttachment.fileExtension}`
-        : '';
-      newAttachment
-        .getPath()
-        .should.be.equal(
-          `${config.attachments.storage.rootDir}${config.attachments.path}${newAttachment.id}${optionalExtension}`,
-        );
-
-      newAttachment.s3Uploads = s3Uploads;
-      newAttachment.s3Deletes = s3Deletes;
-
-      if (useS3) {
-        // Should upload original
-        const origKey = config.attachments.path + newAttachment.getFilename();
-        s3Uploads.should.include.key(origKey);
-
-        s3Uploads[origKey].should.have.property('ACL', 'public-read');
-        s3Uploads[origKey].should.have.property('Bucket', config.attachments.storage.bucket);
-        s3Uploads[origKey].should.have.property('Key', origKey);
-        s3Uploads[origKey].should.have.property('ContentType', newAttachment.mimeType);
-
-        for (const key of Object.keys(s3Uploads)) {
-          const dispName = file.changeableExtension
-            ? path.parse(newAttachment.fileName).name + path.parse(key).ext
-            : file.name;
-          s3Uploads[key].should.have.property(
-            'ContentDisposition',
-            newAttachment.getContentDisposition(dispName),
-          );
-        }
-
-        if (file.size >= 0) {
-          s3Uploads[origKey].Body.length.should.be.equal(file.size);
-        } else {
-          // Just checking for not-zero size
-          s3Uploads[origKey].Body.length.should.be.above(0);
-        }
-      } else {
-        const stats = await stat(newAttachment.getPath());
-
-        if (file.size >= 0) {
-          stats.size.should.be.equal(file.size);
-        } else {
-          // Just checking for not-zero size
-          stats.size.should.be.above(0);
-        }
-      }
-
-      return newAttachment;
-    };
-
-    before(async () => {
-      // Create user
-      user = new User({
-        username: 'Luna',
-        password: 'password',
-      });
-      await user.create();
-
-      // Create directories for attachments
-      await mkdirp(config.attachments.storage.rootDir + config.attachments.path);
-
-      await Promise.all(
-        _.map(config.attachments.imageSizes, (size) =>
-          mkdirp(config.attachments.storage.rootDir + size.path),
-        ),
-      );
     });
+  });
 
-    beforeEach(async () => {
-      // "Upload" files
-      const filesToUpload = {
-        'test-image.150x150.png': '1',
-        'test-image.900x300.png': '2',
-        'test-image.1500x1000.png': '3',
-        'test-image.3000x2000.png': '4',
-        'test-image-exif-rotated.900x300.jpg': '5',
-        'test-image-sgrb.png': '6',
-        'test-image-animated.gif': '7',
-        'sample.mp3': '8',
-        sample: '9',
-        'test-image-webp.webp': '10',
-        'test-quicktime-video.mov': '11',
-      };
+  it('should remove files of image attachment', async () => {
+    const attachment = await createAndCheckAttachment(testFiles.large, post, user);
+    await filesMustExist(attachment);
+    await attachment.deleteFiles();
+    await filesMustExist(attachment, false);
+  });
 
-      const srcPrefix = path.resolve(__dirname, '../../fixtures');
-      const targetPrefix = '/tmp/upload_12345678901234567890123456789012_';
+  it('should destroy attachment object', async () => {
+    const attachment = await createAndCheckAttachment(testFiles.audioMp3, post, user);
+    await attachment.destroy();
 
-      await Promise.all(
-        _.map(filesToUpload, async (target, src) => {
-          const data = await readFile(path.resolve(srcPrefix, src));
-          return writeFile(`${targetPrefix}${target}`, data);
-        }),
-      );
-    });
+    await filesMustExist(attachment, false);
+    const deleted = await dbAdapter.getAttachmentById(attachment.id);
+    expect(deleted, 'to be null');
+  });
 
-    beforeEach(async () => {
-      // Create post
-      const newPost = await user.newPost({ body: 'Post body' });
-      post = await newPost.create();
-    });
-
-    afterEach(async () => {
-      await post.destroy();
-    });
-
-    it('should create a small attachment', async () => {
-      const newAttachment = await createAndCheckAttachment(files.small, post, user);
-
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('1');
-
-      newAttachment.should.have.property('imageSizes');
-      newAttachment.imageSizes.should.be.deep.equal({
-        o: {
-          w: 150,
-          h: 150,
-          url: `${config.attachments.url}${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
+  describe('S3 storage', () => {
+    withModifiedConfig({
+      attachments: {
+        storage: {
+          type: 's3',
+          bucket: 'bucket-name',
+          s3Client: fakeS3,
         },
-      });
+      },
     });
 
-    it('should create a small attachment on S3', async () => {
-      const newAttachment = await createAndCheckAttachment(files.small, post, user, true);
-      const origKey = `${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`;
-      newAttachment.s3Uploads.should.have.key(origKey);
-    });
-
-    it('should create a medium attachment', async () => {
-      const newAttachment = await createAndCheckAttachment(files.medium, post, user);
-
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('0');
-
-      newAttachment.should.have.property('imageSizes');
-      newAttachment.imageSizes.should.be.deep.equal({
-        o: {
-          w: 900,
-          h: 300,
-          url: `${config.attachments.url}${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t: {
-          w: 525,
-          h: 175,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-      });
-    });
-
-    it('should create a medium attachment on S3', async () => {
-      const newAttachment = await createAndCheckAttachment(files.medium, post, user, true);
-      newAttachment.s3Uploads.should.have.keys(
-        `${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        `${config.attachments.imageSizes.t.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-      );
-    });
-
-    it('should create a large attachment', async () => {
-      const newAttachment = await createAndCheckAttachment(files.large, post, user);
-
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('0');
-
-      newAttachment.should.have.property('imageSizes');
-      newAttachment.imageSizes.should.be.deep.equal({
-        o: {
-          w: 1500,
-          h: 1000,
-          url: `${config.attachments.url}${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t: {
-          w: 263,
-          h: 175,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t2: {
-          w: 525,
-          h: 350,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t2.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-      });
-    });
-
-    it('should create a large attachment on S3', async () => {
-      const newAttachment = await createAndCheckAttachment(files.large, post, user, true);
-      newAttachment.s3Uploads.should.have.keys(
-        `${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        `${config.attachments.imageSizes.t.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        `${config.attachments.imageSizes.t2.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-      );
-    });
-
-    it('should create an x-large attachment', async () => {
-      const newAttachment = await createAndCheckAttachment(files.xlarge, post, user);
-
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('0');
-
-      newAttachment.should.have.property('imageSizes');
-      newAttachment.imageSizes.should.be.deep.equal({
-        o: {
-          w: 3000,
-          h: 2000,
-          url: `${config.attachments.url}${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t: {
-          w: 263,
-          h: 175,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t2: {
-          w: 525,
-          h: 350,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t2.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        anotherTestSize: {
-          w: 1600,
-          h: 1067,
-          url: `${config.attachments.url}${config.attachments.imageSizes.anotherTestSize.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-      });
-    });
-
-    it('should create a medium attachment with exif rotation', async () => {
-      const newAttachment = await createAndCheckAttachment(files.rotated, post, user);
-
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('0');
-
-      newAttachment.should.have.property('imageSizes');
-      newAttachment.imageSizes.should.be.deep.equal({
-        o: {
-          w: 900,
-          h: 300,
-          url: `${config.attachments.url}${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t: {
-          w: 525,
-          h: 175,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-      });
-    });
-
-    it('should create a proper colored preview from non-sRGB original', async () => {
-      const newAttachment = await createAndCheckAttachment(files.colorprofiled, post, user);
-
-      // original colors
-      {
-        const original = gm(newAttachment.getPath());
-        original.toBufferAsync = util.promisify(original.toBuffer);
-
-        const buffer = await original.resize(1, 1).bitdepth(8).toBufferAsync('RGB');
-
-        buffer.length.should.be.equal(3);
-        buffer[0].should.be.within(191, 193);
-        buffer[1].should.be.within(253, 255);
-        buffer[2].should.be.within(127, 129);
-      }
-
-      // thumbnail colors
-      {
-        const thumbnailFile = newAttachment.getResizedImagePath('t');
-        thumbnailFile.should.be.a.file().and.not.empty;
-
-        const thumbnail = gm(thumbnailFile);
-        thumbnail.toBufferAsync = util.promisify(thumbnail.toBuffer);
-
-        const buffer = await thumbnail.resize(1, 1).bitdepth(8).toBufferAsync('RGB');
-
-        buffer.length.should.be.equal(3);
-        buffer[0].should.be.within(253, 255);
-        buffer[1].should.be.within(191, 193);
-        buffer[2].should.be.within(127, 129);
-      }
-    });
-
-    it('should create a gif attachment', async () => {
-      const newAttachment = await createAndCheckAttachment(files.animated, post, user);
-
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('0');
-
-      newAttachment.should.have.property('imageSizes');
-      newAttachment.imageSizes.should.be.deep.equal({
-        o: {
-          w: 774,
-          h: 392,
-          url: `${config.attachments.url}${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t: {
-          w: 346,
-          h: 175,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t2: {
-          w: 691,
-          h: 350,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t2.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-      });
-    });
-
-    it('should create a webp attachment', async () => {
-      const newAttachment = await createAndCheckAttachment(files.webp, post, user);
-
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('0');
-
-      newAttachment.should.have.property('imageSizes');
-      newAttachment.imageSizes.should.be.deep.equal({
-        o: {
-          w: 400,
-          h: 301,
-          url: `${config.attachments.url}${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        },
-        t: {
-          w: 233,
-          h: 175,
-          url: `${config.attachments.url}${config.attachments.imageSizes.t.path}${newAttachment.id}.jpg`,
-        },
-      });
-    });
-
-    it('should create a webp attachment on S3', async () => {
-      const newAttachment = await createAndCheckAttachment(files.webp, post, user, true);
-      newAttachment.s3Uploads.should.have.keys(
-        `${config.attachments.path}${newAttachment.id}.${newAttachment.fileExtension}`,
-        `${config.attachments.imageSizes.t.path}${newAttachment.id}.jpg`,
-      );
-    });
-
-    it('should create an audio attachment', async () => {
-      const newAttachment = await createAndCheckAttachment(files.audio, post, user);
-      newAttachment.should.have.a.property('mimeType');
-      newAttachment.mimeType.should.be.equal('audio/mpeg');
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('1');
-      newAttachment.should.have.a.property('mediaType');
-      newAttachment.mediaType.should.be.equal('audio');
-    });
-
-    it('should create an audio attachment from audio file without extension', async () => {
-      const newAttachment = await createAndCheckAttachment(files.unknown, post, user);
-      newAttachment.should.have.a.property('mimeType');
-      newAttachment.mimeType.should.be.equal('audio/mpeg');
-      newAttachment.should.have.a.property('noThumbnail');
-      newAttachment.noThumbnail.should.be.equal('1');
-      newAttachment.should.have.a.property('mediaType');
-      newAttachment.mediaType.should.be.equal('audio');
-    });
+    it('should create a small attachment on S3', () =>
+      createAndCheckAttachment(testFiles.small, post, user));
+    it('should create a medium attachment on S3', () =>
+      createAndCheckAttachment(testFiles.medium, post, user));
+    it('should create a large attachment on S3', () =>
+      createAndCheckAttachment(testFiles.large, post, user));
+    it('should create an x-large attachment on S3', () =>
+      createAndCheckAttachment(testFiles.xlarge, post, user));
+    it('should create a webp attachment on S3', () =>
+      createAndCheckAttachment(testFiles.webp, post, user));
 
     it('should remove files of image attachment', async () => {
-      const attachment = await createAndCheckAttachment(files.large, post, user);
-      await filesMustExist(attachment);
+      const attachment = await createAndCheckAttachment(testFiles.large, post, user);
+      filesMustExistOnS3(attachment);
       await attachment.deleteFiles();
-      await filesMustExist(attachment, false);
-    });
-
-    it('should remove files of image attachment from S3', async () => {
-      const attachment = await createAndCheckAttachment(files.large, post, user, true);
-      await attachment.deleteFiles();
-      attachment.s3Deletes.should.have.keys(...Object.keys(attachment.s3Uploads));
-    });
-
-    it('should remove files of audio attachment', async () => {
-      const attachment = await createAndCheckAttachment(files.audio, post, user);
-      await filesMustExist(attachment);
-      await attachment.deleteFiles();
-      await filesMustExist(attachment, false);
-    });
-
-    it('should destroy attachment object', async () => {
-      const attachment = await createAndCheckAttachment(files.audio, post, user);
-      await attachment.destroy();
-
-      await filesMustExist(attachment, false);
-      const deleted = await dbAdapter.getAttachmentById(attachment.id);
-      expect(deleted).to.be.null;
-    });
-
-    it(`should produce 'inline' Content-Disposition for image/jpeg file`, () => {
-      const attachment = new Attachment({ fileName: 'sample', mimeType: 'image/jpeg' });
-      expect(attachment.getContentDisposition('sample')).to.be.equal(
-        `inline; filename="sample"; filename*=utf-8''sample`,
-      );
-    });
-
-    it(`should produce 'attachment' Content-Disposition for application/zip file`, () => {
-      const attachment = new Attachment({ fileName: 'sample', mimeType: 'application/zip' });
-      expect(attachment.getContentDisposition('sample')).to.be.equal(
-        `attachment; filename="sample"; filename*=utf-8''sample`,
-      );
-    });
-
-    it(`should use original filename in content-disposition header (including the extension) for video/quicktime file`, async () => {
-      // Make sure non-whitelisted file formats (such as .mov) can be downloaded with their original name, including the extension
-      await createAndCheckAttachment(files.mov, post, user, true);
+      filesMustExistOnS3(attachment, false);
     });
   });
 });
+
+async function uploadFile(fileObject) {
+  const tmpDir = tmpdir();
+  const path = join(tmpDir, `upl-${createUuid()}`);
+  const data = await readFile(resolve(fixturesDir, fileObject.name));
+  await writeFile(path, data);
+  return path;
+}
+
+async function createAndCheckAttachment(fileObject, post, user) {
+  const path = await uploadFile(fileObject);
+  const baseName = basename(fileObject.name);
+  const att = await Attachment.create(path, baseName, user, post?.id);
+
+  expect(att, 'to be a', Attachment);
+  expect(att.mediaType, 'to be one of', ['image', 'audio', 'video', 'general']);
+  expect(att.fileName, 'to be', baseName);
+
+  if (fileObject.size >= 0) {
+    expect(att.fileSize, 'to be', fileObject.size);
+  }
+
+  expect(att.mimeType, 'to be', fileObject.type);
+  expect(att.fileExtension, 'to be', fileObject.extension ?? extname(fileObject.name).slice(1));
+
+  if (currentConfig().attachments.storage.type === 's3') {
+    // Original should be uploaded
+    const origKey = att.getRelFilePath('', att.fileExtension);
+    expect(fakeS3.items.has(origKey), 'to be truthy');
+    expect(fakeS3.items.get(origKey), 'to satisfy', {
+      ACL: 'public-read',
+      Bucket: currentConfig().attachments.storage.bucket,
+      Key: origKey,
+      ContentType: att.mimeType,
+      ContentDisposition: att.getContentDisposition(att.fileName),
+    });
+
+    if (fileObject.size) {
+      expect(fakeS3.items.get(origKey).Body, 'to have length', fileObject.size);
+    } else {
+      // Just checking for not-zero size
+      expect(fakeS3.items.get(origKey).Body, 'to be non-empty');
+    }
+
+    // All previews should be uploaded
+    for (const { variant, ext } of att.allFileVariants()) {
+      const previewKey = att.getRelFilePath(variant, ext);
+      const dispositionName = `${parsePath(att.fileName).name}.${ext}`;
+      expect(fakeS3.items.has(previewKey), 'to be truthy');
+      expect(fakeS3.items.get(previewKey), 'to satisfy', {
+        ACL: 'public-read',
+        Bucket: currentConfig().attachments.storage.bucket,
+        Key: previewKey,
+        ContentType: mimeLookup(ext) || 'application/octet-stream',
+        ContentDisposition: att.getContentDisposition(dispositionName),
+      });
+    }
+  } else {
+    const { rootDir } = currentConfig().attachments.storage;
+    const { size } = await stat(join(rootDir, att.getRelFilePath('', att.fileExtension)));
+
+    if (fileObject.size >= 0) {
+      expect(size, 'to be', fileObject.size);
+    } else {
+      // Just checking for not-zero size
+      expect(size, 'to be above', 0);
+    }
+
+    // All previews should be created
+    await Promise.all(
+      att.allRelFilePaths().map(async (p) => {
+        const { size: sz } = await stat(join(rootDir, p));
+        expect(sz, 'to be above', 0);
+      }),
+    );
+  }
+
+  return att;
+}
+
+function filesMustExist(attachment, mustExist = true) {
+  const { rootDir } = currentConfig().attachments.storage;
+
+  return Promise.all(
+    attachment.allRelFilePaths().map(async (p) => {
+      const path = join(rootDir, p);
+
+      try {
+        await stat(path);
+
+        if (!mustExist) {
+          throw new Error(`File should not exist: ${path}`);
+        }
+      } catch (err) {
+        if (mustExist && err.code === 'ENOENT') {
+          throw new Error(`File should exist: ${path}`);
+        } else if (err.code !== 'ENOENT' || mustExist) {
+          throw err;
+        }
+      }
+    }),
+  );
+}
+
+function filesMustExistOnS3(attachment, mustExist = true) {
+  for (const p of attachment.allRelFilePaths()) {
+    if (!mustExist && fakeS3.items.has(p)) {
+      throw new Error(`File should not exist: ${p}`);
+    } else if (mustExist && !fakeS3.items.has(p)) {
+      throw new Error(`File should exist: ${p}`);
+    }
+  }
+}

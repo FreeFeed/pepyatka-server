@@ -1,3 +1,5 @@
+import { extname } from 'path';
+
 import { MediaType } from './types';
 
 // For some formats there are predefined extensions
@@ -40,11 +42,16 @@ export function addFileExtension<T extends TypeInfo>(
   }
 
   // For other files we need to guess it from the file name
-  extension = fileName
-    .substring(fileName.lastIndexOf('.') + 1)
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, '') // Only the restricted set of chars is allowed
-    .slice(0, 6); // Limit the length of the extension
+  const ext = extname(fileName);
+
+  if (!ext) {
+    extension = 'dat';
+  } else {
+    extension = ext
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '') // Only the restricted set of chars is allowed
+      .slice(0, 6); // Limit the length of the extension
+  }
 
   return { ...info, extension };
 }

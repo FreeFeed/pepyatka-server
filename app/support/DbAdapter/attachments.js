@@ -189,6 +189,7 @@ const ATTACHMENT_COLUMNS = {
   userId: 'user_id',
   postId: 'post_id',
   sanitized: 'sanitized',
+  previews: 'previews',
 };
 
 const ATTACHMENT_COLUMNS_MAPPING = {
@@ -209,9 +210,6 @@ const ATTACHMENT_COLUMNS_MAPPING = {
   noThumbnail: (no_thumbnail) => {
     return no_thumbnail === '1';
   },
-  fileSize: (file_size) => {
-    return parseInt(file_size, 10);
-  },
   postId: (post_id) => {
     if (validator.isUUID(post_id)) {
       return post_id;
@@ -225,6 +223,12 @@ const ATTACHMENT_COLUMNS_MAPPING = {
     }
 
     return null;
+  },
+  imageSizes: (image_sizes) => {
+    return image_sizes ? JSON.stringify(image_sizes) : null;
+  },
+  previews: (previews) => {
+    return previews ? JSON.stringify(previews) : null;
   },
 };
 
@@ -244,6 +248,7 @@ export const ATTACHMENT_FIELDS = {
   user_id: 'userId',
   post_id: 'postId',
   sanitized: 'sanitized',
+  previews: 'previews',
 };
 
 const ATTACHMENT_FIELDS_MAPPING = {
@@ -257,7 +262,7 @@ const ATTACHMENT_FIELDS_MAPPING = {
     return no_thumbnail ? '1' : '0';
   },
   file_size: (file_size) => {
-    return file_size && file_size.toString();
+    return file_size && parseInt(file_size);
   },
   post_id: (post_id) => {
     return post_id ? post_id : '';

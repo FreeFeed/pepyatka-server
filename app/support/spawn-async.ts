@@ -1,29 +1,39 @@
+/* eslint-disable no-redeclare */
 import { spawn, type SpawnOptionsWithoutStdio } from 'child_process';
+
+export type SpawnAsyncOptions = SpawnOptionsWithoutStdio & { binary?: true };
 
 /**
  * Spawns a child process and returns a promise resolving with its output
- *
- * @param {string} command - The command to run.
- * @param {Array<string>} args - List of string arguments.
- * @param {SpawnOptionsWithoutStdio} options - Options to pass to the spawn function.
- * @returns {Promise<{stdout: string, stderr: string}>} - Promise that resolves with the output.
  */
 export function spawnAsync(
   command: string,
+  args: readonly string[],
+  options: SpawnOptionsWithoutStdio & { binary: true },
+): Promise<{ stdout: Buffer; stderr: string }>;
+export function spawnAsync(
+  command: string,
+  args: readonly string[],
+  options?: SpawnOptionsWithoutStdio,
+): Promise<{ stdout: string; stderr: string }>;
+export function spawnAsync(
+  command: string,
   args: readonly string[] = [],
-  options: SpawnOptionsWithoutStdio = {},
-): Promise<{ stdout: string; stderr: string }> {
+  options: SpawnOptionsWithoutStdio & { binary?: true } = {},
+): Promise<{ stdout: string | Buffer; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, options);
+    const { binary = false } = options;
 
-    let stdout = '';
+    const stdoutParts: Uint8Array[] = [];
     let stderr = '';
-    child.stdout.on('data', (data) => (stdout += data.toString()));
+    child.stdout.on('data', (data) => stdoutParts.push(data));
     child.stderr.on('data', (data) => (stderr += data.toString()));
 
     child.on('close', (code) => {
       if (code === 0) {
-        resolve({ stdout, stderr });
+        const stdout = Buffer.concat(stdoutParts);
+        resolve({ stdout: binary ? stdout : stdout.toString(), stderr });
       } else {
         reject(new Error(`Process exited with code ${code}\n${stderr}`));
       }

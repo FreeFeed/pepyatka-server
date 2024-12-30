@@ -1,3 +1,5 @@
+import { type S3 } from '@aws-sdk/client-s3';
+
 // We cannot use regular 'import' in the ambient module
 type ISO8601DurationString = import('../app/support/types').ISO8601DurationString;
 type InvitationCreationCriterion =
@@ -34,9 +36,20 @@ declare module 'config' {
           };
         }
       >;
-      storage: {
-        rootDir: string;
-      };
+      storage:
+        | {
+            type: 'fs';
+            rootDir: string;
+          }
+        | {
+            type: 's3';
+            accessKeyId: string;
+            secretAccessKey: string;
+            bucket: string;
+            region: string;
+            s3ConfigOptions: Record<string, unknown>;
+            s3Client: S3;
+          };
       sanitizeMetadata: {
         removeTags: RegExp[];
         ignoreTags: RegExp[];
@@ -217,6 +230,12 @@ declare module 'config' {
         height: number;
       };
     };
+    imagePreviews: {
+      format: string;
+      extension: string;
+      quality: number;
+    };
+    nonVisualPreviewTypes: string[];
   };
 
   const c: Config;

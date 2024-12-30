@@ -43,6 +43,36 @@ export type MediaInfoGeneral = {
 
 export type MediaInfo = MediaInfoImage | MediaInfoVideo | MediaInfoAudio | MediaInfoGeneral;
 
+/**
+ * Data structure (almost) ready to be stored in DB
+ */
+export type MediaProcessResult = {
+  mediaType: MediaType;
+  fileName: string;
+  fileSize: number;
+  fileExtension: string;
+  mimeType: string;
+
+  duration?: number;
+  previews?: {
+    image?: VisualPreviews;
+    video?: VisualPreviews;
+    audio?: NonVisualPreviews;
+  };
+  meta?: {
+    animatedImage?: true;
+    'dc:title'?: string;
+    'dc:creator'?: string;
+  };
+
+  files?: FilesToUpload;
+};
+
+export type FilesToUpload = { [variant: string]: { path: string; ext: string } };
+
+export type VisualPreviews = { [variant: string]: { w: number; h: number; ext: string } };
+export type NonVisualPreviews = { [variant: string]: { ext: string } };
+
 export type Stream = { codec_name: string } & (
   | {
       codec_type: 'video';

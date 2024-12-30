@@ -1,14 +1,9 @@
-import util from 'util';
 import { open } from 'fs/promises';
-
-import gmLib from 'gm';
 
 import { spawnAsync } from '../spawn-async';
 
 import { FfprobeResult, MediaInfo, MediaInfoVideo } from './types';
 import { addFileExtension } from './file-ext';
-
-const gm = gmLib.subClass({ imageMagick: true });
 
 export async function detectMediaType(
   localFilePath: string,
@@ -19,12 +14,14 @@ export async function detectMediaType(
 
   if (probablyImage) {
     // Identify using ImageMagick
-    const image = gm(localFilePath);
-    const identifyAsync = util.promisify<string, string>(image.identify);
-
     try {
-      const info = await identifyAsync.call(image, '%m %w %h %[orientation]');
-      const parts = info.split(' ');
+      const out = await spawnAsync('identify', [
+        '-format',
+        '%m %w %h %[orientation]',
+        localFilePath,
+      ]);
+
+      const parts = out.stdout.split(' ');
       const format = parts[0].toLowerCase();
 
       let width = parseInt(parts[1], 10);

@@ -18,6 +18,8 @@ import { exiftool } from 'exiftool-vendored';
 
 import { getS3 } from '../support/s3';
 import { sanitizeMediaMetadata, SANITIZE_NONE, SANITIZE_VERSION } from '../support/sanitize-media';
+import { processMediaFile } from '../support/media-files/process';
+import { currentConfig } from '../support/app-async-context';
 
 const gm = gmLib.subClass({ imageMagick: true });
 
@@ -82,7 +84,8 @@ export function addModel(dbAdapter) {
       this.mediaType = params.mediaType; // image | audio | general
 
       this.noThumbnail = params.noThumbnail; // if true, image thumbnail URL == original URL
-      this.imageSizes = params.imageSizes || {}; // pixel sizes of thumbnail(s) and original image, e.g. {t: {w: 200, h: 175}, o: {w: 600, h: 525}}
+      this._imageSizes = params.imageSizes; // pixel sizes of thumbnail(s) and original image, e.g. {t: {w: 200, h: 175}, o: {w: 600, h: 525}}
+      this.previews = params.previews;
 
       this.artist = params.artist; // filled only for audio
       this.title = params.title; // filled only for audio
@@ -107,14 +110,88 @@ export function addModel(dbAdapter) {
     }
 
     get imageSizes() {
-      return this.imageSizes_;
-    }
-    set imageSizes(newValue) {
-      if (_.isString(newValue)) {
-        newValue = JSON.parse(newValue);
+      if (this._imageSizes) {
+        return this._imageSizes;
       }
 
-      this.imageSizes_ = newValue;
+      const imagePreviews = this.previews?.image;
+
+      if (imagePreviews) {
+        const attUrl = currentConfig().attachments.url;
+        const imageSizes = {};
+        let maxVariant = '';
+        let maxWidth = 0;
+
+        for (const [variant, { w, h, ext }] of Object.entries(imagePreviews)) {
+          if (w > maxWidth) {
+            maxVariant = variant;
+            maxWidth = w;
+          }
+
+          if (variant === 'thumbnails') {
+            imageSizes['t'] = { w, h, url: attUrl + this.getRelFilePath('thumbnails', ext) };
+          } else if (variant === 'thumbnails2') {
+            imageSizes['t2'] = { w, h, url: attUrl + this.getRelFilePath('thumbnails2', ext) };
+          }
+        }
+
+        const { w, h, ext } = imagePreviews[maxVariant];
+        imageSizes['o'] = { w, h, url: attUrl + this.getRelFilePath(maxVariant, ext) };
+      }
+
+      return {};
+    }
+
+    static async create(filePath, fileName, user, postId = null) {
+      let sanitized = SANITIZE_NONE;
+
+      if (user.preferences.sanitizeMediaMetadata) {
+        await sanitizeMediaMetadata(filePath);
+        sanitized = SANITIZE_VERSION;
+      }
+
+      const { files = {}, ...mediaData } = await processMediaFile(filePath, fileName);
+
+      // Save record to DB
+      const params = {
+        ...mediaData,
+        sanitized,
+        postId,
+        userId: user.id,
+        imageSizes: JSON.stringify(mediaData.imageSizes || {}),
+      };
+
+      const id = await dbAdapter.createAttachment(params);
+      /** @type {Attachment} */
+      const object = await dbAdapter.getAttachmentById(id);
+
+      const storageConfig = currentConfig().attachments.storage;
+
+      // Upload or move files
+      await Promise.all(
+        Object.entries(files).map(async ([variant, { path, ext }]) => {
+          const fPath = object.getRelFilePath(variant, ext);
+
+          if (storageConfig.type === 's3') {
+            const mimeType = mime.lookup(ext) || 'application/octet-stream';
+            await object.uploadToS3(path, fPath, mimeType);
+            await fs.unlink(path);
+          } else {
+            await mvAsync(path, storageConfig.rootDir + fPath, {});
+          }
+        }),
+      );
+
+      return object;
+    }
+
+    /**
+     * @param {string} variant
+     * @param {string} ext
+     * @return {string}
+     */
+    getRelFilePath(variant, ext) {
+      return `${currentConfig().attachments.path}${variant ? `${variant}/` : ''}${this.id}.${ext}`;
     }
 
     validate() {
@@ -129,65 +206,6 @@ export function addModel(dbAdapter) {
       if (!valid) {
         throw new Error('Invalid');
       }
-    }
-
-    async create() {
-      this.createdAt = new Date().getTime();
-      this.updatedAt = new Date().getTime();
-      this.postId = this.postId || '';
-
-      this.validate();
-
-      this.id = await dbAdapter.createAttachment({
-        postId: this.postId,
-        createdAt: this.createdAt.toString(),
-        updatedAt: this.updatedAt.toString(),
-      });
-
-      this.fileName = this.file.name;
-      this.fileSize = this.file.size;
-      this.mimeType = this.file.type;
-
-      // Determine initial file extension
-      // (it might be overridden later when we know MIME type from its contents)
-      const { supportedExtensions } = config.media;
-      this.fileExtension = '';
-
-      if (this.fileName && this.fileName.match(supportedExtensions) !== null) {
-        const m = /\.([^.]+)$/.exec(this.fileName);
-        const ext = m[1].toLowerCase();
-
-        if (supportedExtensions.includes(ext)) {
-          this.fileExtension = ext;
-        }
-      }
-
-      await this.handleMedia();
-
-      // Save record to DB
-      const params = {
-        fileName: this.fileName,
-        fileSize: this.fileSize,
-        mimeType: this.mimeType,
-        mediaType: this.mediaType,
-        fileExtension: this.fileExtension,
-        noThumbnail: this.noThumbnail,
-        imageSizes: JSON.stringify(this.imageSizes),
-        userId: this.userId,
-        postId: this.postId,
-        createdAt: this.createdAt.toString(),
-        updatedAt: this.updatedAt.toString(),
-        sanitized: this.sanitized,
-      };
-
-      if (this.mediaType === 'audio') {
-        params.artist = this.artist;
-        params.title = this.title;
-      }
-
-      await dbAdapter.updateAttachment(this.id, params);
-
-      return this;
     }
 
     get url() {
@@ -236,7 +254,7 @@ export function addModel(dbAdapter) {
     }
 
     getResizedImageExtension() {
-      return this.fileExtension === 'webp' ? 'jpg' : this.fileExtension;
+      return 'webp';
     }
 
     getResizedImageMimeType() {
@@ -481,14 +499,14 @@ export function addModel(dbAdapter) {
     }
 
     // Upload original attachment or its thumbnail to the S3 bucket
-    async uploadToS3(sourceFile, destPath, mimeType) {
-      const dispositionName = this.fileExtension
-        ? parsePath(this.fileName).name + parsePath(destPath).ext // original extension for whitelisted types, but might be 'jpg' for webp
-        : this.fileName; // original extension for non-whitelisted types
+    async uploadToS3(sourceFile, destPath) {
+      const storageConfig = currentConfig().attachments.storage;
+      const dispositionName = parsePath(this.fileName).name + parsePath(destPath).ext;
+      const mimeType = mime.lookup(dispositionName) || 'application/octet-stream';
 
-      await this.s3.putObject({
+      await storageConfig.s3Client.putObject({
         ACL: 'public-read',
-        Bucket: this.s3bucket,
+        Bucket: storageConfig.bucket,
         Key: destPath,
         Body: createReadStream(sourceFile),
         ContentType: mimeType,
@@ -498,18 +516,46 @@ export function addModel(dbAdapter) {
 
     // Get cross-browser Content-Disposition header for attachment
     getContentDisposition(dispositionName) {
+      const mimeType = mime.lookup(dispositionName) || 'application/octet-stream';
+
       // Old browsers (IE8) need ASCII-only fallback filenames
       const fileNameAscii = dispositionName.replace(/[^\x00-\x7F]/g, '_');
 
       // Modern browsers support UTF-8 filenames
       const fileNameUtf8 = encodeURIComponent(dispositionName);
 
-      const disposition = config.media.inlineMimeTypes.includes(this.mimeType)
+      const disposition = currentConfig().media.inlineMimeTypes.includes(mimeType)
         ? 'inline'
         : 'attachment';
 
       // Inline version of 'attfnboth' method (http://greenbytes.de/tech/tc2231/#attfnboth)
       return `${disposition}; filename="${fileNameAscii}"; filename*=utf-8''${fileNameUtf8}`;
+    }
+
+    /**
+     * Get all file variants, including original (variant = '') and previews
+     *
+     * @returns {{variant: string, ext: string}[]}
+     */
+    allFileVariants() {
+      const variants = Object.values(this.previews).flatMap((vars) =>
+        Object.entries(vars).map(([variant, { ext }]) => ({ variant, ext })),
+      );
+
+      if (!variants.some(({ variant }) => variant === '')) {
+        variants.push({ variant: '', ext: this.fileExtension });
+      }
+
+      return variants;
+    }
+
+    /**
+     * Get list of relative paths to attachment's files, including original and previews
+     *
+     * @returns {string[]}
+     */
+    allRelFilePaths() {
+      return this.allFileVariants().map(({ variant, ext }) => this.getRelFilePath(variant, ext));
     }
 
     async destroy() {
@@ -521,20 +567,17 @@ export function addModel(dbAdapter) {
      * Delete all attachment's files
      */
     async deleteFiles() {
-      const thumbIds = Object.keys(this.imageSizes).filter((s) => s !== 'o');
+      const storageConfig = currentConfig().attachments.storage;
 
-      if (this.s3) {
-        const keys = [
-          config.attachments.path + this.getFilename(),
-          ...thumbIds.map((s) => config.attachments.imageSizes[s].path + this.getFilename()),
-        ];
+      if (storageConfig.type === 's3') {
+        const keys = this.allRelFilePaths();
 
         await Promise.all(
           keys.map(async (Key) => {
             try {
-              await this.s3.deleteObject({
+              await storageConfig.s3Client.deleteObject({
                 Key,
-                Bucket: this.s3bucket,
+                Bucket: storageConfig.bucket,
               });
             } catch (err) {
               // It is ok if file isn't found
@@ -545,12 +588,10 @@ export function addModel(dbAdapter) {
           }),
         );
       } else {
-        const filePaths = [this.getPath(), ...thumbIds.map((s) => this.getResizedImagePath(s))];
-
         await Promise.all(
-          filePaths.map(async (filePath) => {
+          this.allRelFilePaths().map(async (path) => {
             try {
-              await fs.unlink(filePath);
+              await fs.unlink(storageConfig.rootDir + path);
             } catch (err) {
               // It is ok if file isn't found
               if (err.code !== 'ENOENT') {

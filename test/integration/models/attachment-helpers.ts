@@ -8,7 +8,7 @@ import { Attachment } from '../../../app/models';
 type FileInfo = {
   name: string;
   type: string;
-  content: string | Buffer;
+  content: string | Uint8Array;
 };
 
 export async function createAttachment(
