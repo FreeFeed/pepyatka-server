@@ -85,7 +85,7 @@ export function addModel(dbAdapter) {
 
       this.noThumbnail = params.noThumbnail; // if true, image thumbnail URL == original URL
       this._imageSizes = params.imageSizes; // pixel sizes of thumbnail(s) and original image, e.g. {t: {w: 200, h: 175}, o: {w: 600, h: 525}}
-      this.previews = params.previews;
+      this._previews = params.previews;
 
       this.artist = params.artist; // filled only for audio
       this.title = params.title; // filled only for audio
@@ -107,6 +107,50 @@ export function addModel(dbAdapter) {
 
       this.s3 = storageConfig.type === 's3' ? getS3(storageConfig) : null;
       this.s3bucket = storageConfig.type === 's3' ? storageConfig.bucket : null;
+    }
+
+    get previews() {
+      if (!this._previews) {
+        this._previews = this.getPreviewsDataForLegacyFile();
+      }
+
+      return this._previews;
+    }
+
+    getPreviewsDataForLegacyFile() {
+      const result = {};
+
+      if (this.mediaType === 'image') {
+        const variants = {
+          o: '',
+          t: 'thumbnails',
+          t2: 'thumbnails2',
+        };
+
+        result.image = {};
+
+        for (const [key, variant] of Object.entries(variants)) {
+          const entry = this._imageSizes[key];
+
+          if (!entry) {
+            continue;
+          }
+
+          result.image[variant] = {
+            w: entry.w,
+            h: entry.h,
+            ext: entry.url.split('.').pop(),
+          };
+        }
+      }
+
+      if (this.mediaType === 'audio') {
+        result.audio = {
+          '': { ext: this.fileExtension },
+        };
+      }
+
+      return result;
     }
 
     get imageSizes() {

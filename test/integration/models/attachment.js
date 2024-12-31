@@ -306,6 +306,82 @@ describe('Attachments', () => {
     expect(deleted, 'to be null');
   });
 
+  describe("Old 'image_sizes' data in database", () => {
+    it("should create a proper 'previews' field for a small attachment", async () => {
+      const { id } = await createAndCheckAttachment(testFiles.small, post, user);
+      await dbAdapter.database.raw(
+        `update attachments set previews = null, image_sizes = :sizes where uid = :id`,
+        {
+          id,
+          sizes: JSON.stringify({
+            o: { w: 150, h: 150, url: `https://example.com/attachments/${id}.png` },
+          }),
+        },
+      );
+      const att = await dbAdapter.getAttachmentById(id);
+      expect(att.previews, 'to equal', {
+        image: { '': { h: 150, w: 150, ext: 'png' } },
+      });
+    });
+
+    it("should create a proper 'previews' field for a medium attachment", async () => {
+      const { id } = await createAndCheckAttachment(testFiles.medium, post, user);
+      await dbAdapter.database.raw(
+        `update attachments set previews = null, image_sizes = :sizes where uid = :id`,
+        {
+          id,
+          sizes: JSON.stringify({
+            o: { w: 900, h: 300, url: `https://example.com/attachments/${id}.png` },
+            t: { w: 525, h: 175, url: `https://example.com/attachments/thumbnails/${id}.png` },
+          }),
+        },
+      );
+      const att = await dbAdapter.getAttachmentById(id);
+      expect(att.previews, 'to equal', {
+        image: {
+          '': { h: 300, w: 900, ext: 'png' },
+          thumbnails: { h: 175, w: 525, ext: 'png' },
+        },
+      });
+    });
+
+    it("should create a proper 'previews' field for a large attachment", async () => {
+      const { id } = await createAndCheckAttachment(testFiles.large, post, user);
+      await dbAdapter.database.raw(
+        `update attachments set previews = null, image_sizes = :sizes where uid = :id`,
+        {
+          id,
+          sizes: JSON.stringify({
+            o: { w: 1500, h: 1000, url: `https://example.com/attachments/${id}.png` },
+            t: { w: 263, h: 175, url: `https://example.com/attachments/thumbnails/${id}.png` },
+            t2: { w: 525, h: 350, url: `https://example.com/attachments/thumbnails2/${id}.png` },
+          }),
+        },
+      );
+      const att = await dbAdapter.getAttachmentById(id);
+      expect(att.previews, 'to equal', {
+        image: {
+          '': { h: 1000, w: 1500, ext: 'png' },
+          thumbnails: { h: 175, w: 263, ext: 'png' },
+          thumbnails2: { h: 350, w: 525, ext: 'png' },
+        },
+      });
+    });
+
+    it("should create a proper 'previews' field for an audio attachment", async () => {
+      const { id } = await createAndCheckAttachment(testFiles.audioMp3, post, user);
+      await dbAdapter.database.raw(`update attachments set previews = null where uid = :id`, {
+        id,
+      });
+      const att = await dbAdapter.getAttachmentById(id);
+      expect(att.previews, 'to equal', {
+        audio: {
+          '': { ext: 'mp3' },
+        },
+      });
+    });
+  });
+
   describe('S3 storage', () => {
     withModifiedConfig({
       attachments: {

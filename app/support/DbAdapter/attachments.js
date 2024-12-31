@@ -270,4 +270,7 @@ const ATTACHMENT_FIELDS_MAPPING = {
   user_id: (user_id) => {
     return user_id ? user_id : '';
   },
+  image_sizes: (image_sizes) => {
+    return image_sizes ? JSON.parse(image_sizes) : '';
+  },
 };
