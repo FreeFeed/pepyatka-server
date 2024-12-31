@@ -28,6 +28,26 @@ export const testFiles = {
     name: 'test-image-sgrb.png',
     type: 'image/png',
   },
+  adobeRgb: {
+    name: 'media-files/squirrel-adobergb.jpg',
+    type: 'image/jpeg',
+  },
+  cmyk: {
+    name: 'media-files/squirrel-cmyk.jpg',
+    type: 'image/jpeg',
+  },
+  cmykNoProfile: {
+    name: 'media-files/squirrel-cmyk-noicc.jpg',
+    type: 'image/jpeg',
+  },
+  jpegNoProfile: {
+    name: 'media-files/squirrel.jpg',
+    type: 'image/jpeg',
+  },
+  srgb: {
+    name: 'media-files/squirrel-srgb.jpg',
+    type: 'image/jpeg',
+  },
   animated: {
     size: 128467,
     name: 'test-image-animated.gif',

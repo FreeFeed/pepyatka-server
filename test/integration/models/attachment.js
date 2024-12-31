@@ -104,12 +104,20 @@ describe('Attachments', () => {
     const att = await createAndCheckAttachment(testFiles.rotated, post, user);
     expect(att.previews, 'to equal', {
       image: {
-        '': { h: 900, w: 300, ext: 'jpg' },
         p1: { h: 600, w: 200, ext: 'webp' },
+        p2: { h: 900, w: 300, ext: 'webp' }, // Not an original file
         thumbnails: { h: 175, w: 58, ext: 'webp' },
         thumbnails2: { h: 350, w: 117, ext: 'webp' },
       },
     });
+
+    // Check the real rotation of the original file
+    const originalFile = join(
+      currentConfig().attachments.storage.rootDir,
+      att.getRelFilePath('p2', 'webp'),
+    );
+    const out = await spawnAsync('identify', ['-format', '%w %h %[orientation]', originalFile]);
+    expect(out.stdout, 'to equal', '300 900 Undefined');
   });
 
   it('should create a proper colored preview from non-sRGB original', async () => {
@@ -165,6 +173,76 @@ describe('Attachments', () => {
         p2: { h: 516, w: 775, ext: 'webp' },
         p3: { h: 894, w: 1342, ext: 'webp' },
         p4: { h: 1280, w: 1920, ext: 'webp' },
+        thumbnails: { h: 175, w: 263, ext: 'webp' },
+        thumbnails2: { h: 350, w: 525, ext: 'webp' },
+      },
+    });
+  });
+
+  it('should create a Adobe RGB attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.adobeRgb, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        p1: { h: 283, w: 424, ext: 'webp' },
+        p2: { h: 516, w: 775, ext: 'webp' },
+        p3: { h: 894, w: 1342, ext: 'webp' },
+        p4: { h: 1280, w: 1920, ext: 'webp' }, // Not an original image
+        thumbnails: { h: 175, w: 263, ext: 'webp' },
+        thumbnails2: { h: 350, w: 525, ext: 'webp' },
+      },
+    });
+  });
+
+  it('should create a CMYK attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.cmyk, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        p1: { h: 283, w: 424, ext: 'webp' },
+        p2: { h: 516, w: 775, ext: 'webp' },
+        p3: { h: 894, w: 1342, ext: 'webp' },
+        p4: { h: 1280, w: 1920, ext: 'webp' }, // Not an original image
+        thumbnails: { h: 175, w: 263, ext: 'webp' },
+        thumbnails2: { h: 350, w: 525, ext: 'webp' },
+      },
+    });
+  });
+
+  it('should create a CMYK attachment without profile', async () => {
+    const att = await createAndCheckAttachment(testFiles.cmykNoProfile, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        p1: { h: 283, w: 424, ext: 'webp' },
+        p2: { h: 516, w: 775, ext: 'webp' },
+        p3: { h: 894, w: 1342, ext: 'webp' },
+        p4: { h: 1280, w: 1920, ext: 'webp' }, // Not an original image
+        thumbnails: { h: 175, w: 263, ext: 'webp' },
+        thumbnails2: { h: 350, w: 525, ext: 'webp' },
+      },
+    });
+  });
+
+  it('should create a jpeg attachment without profile', async () => {
+    const att = await createAndCheckAttachment(testFiles.jpegNoProfile, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        p1: { h: 283, w: 424, ext: 'webp' },
+        p2: { h: 516, w: 775, ext: 'webp' },
+        p3: { h: 894, w: 1342, ext: 'webp' },
+        '': { h: 1280, w: 1920, ext: 'jpg' }, // Original image
+        thumbnails: { h: 175, w: 263, ext: 'webp' },
+        thumbnails2: { h: 350, w: 525, ext: 'webp' },
+      },
+    });
+  });
+
+  it('should create a jpeg sRGB attachment', async () => {
+    const att = await createAndCheckAttachment(testFiles.srgb, post, user);
+    expect(att.previews, 'to equal', {
+      image: {
+        p1: { h: 283, w: 424, ext: 'webp' },
+        p2: { h: 516, w: 775, ext: 'webp' },
+        p3: { h: 894, w: 1342, ext: 'webp' },
+        '': { h: 1280, w: 1920, ext: 'jpg' }, // Original image
         thumbnails: { h: 175, w: 263, ext: 'webp' },
         thumbnails2: { h: 350, w: 525, ext: 'webp' },
       },

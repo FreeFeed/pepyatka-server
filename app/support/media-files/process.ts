@@ -1,6 +1,7 @@
 import { stat } from 'fs/promises';
 
 import { lookup as mimeLookup } from 'mime-types';
+import { exiftool } from 'exiftool-vendored';
 
 import { spawnAsync } from '../spawn-async';
 
@@ -85,8 +86,15 @@ async function processImage(
       // We can use original in case of PNG and GIF if it is not too big
       (['png', 'gif'].includes(info.format) && fileSize < 512 * 1024)
     ) {
-      // TODO fix for JPEG
-      maxPreviewSize.variant = '';
+      if (info.format === 'jpeg') {
+        const ok = await canUseJpegOriginal(localFilePath);
+
+        if (ok) {
+          maxPreviewSize.variant = '';
+        }
+      } else {
+        maxPreviewSize.variant = '';
+      }
     }
   }
 
@@ -174,4 +182,38 @@ async function processAudio(
 
 function tmpFileVariant(filePath: string, variant: string, ext: string): string {
   return `${filePath}.variant.${variant}.${ext}`;
+}
+
+/**
+ * Can we use the original JPEG file for preview? If so, then process it and
+ * return true, otherwise return false.
+ *
+ * The image can be:
+ *  1. Rotated
+ *  2. Have a non-RGB colorspace
+ *  3. Have a non-sRGB color profile
+ *  4. Have an additional image layer (HDR, etc.)
+ *
+ * When none of these conditions apply, we can use the original image without
+ * changes. Otherwise return false.
+ */
+async function canUseJpegOriginal(localFilePath: string): Promise<boolean> {
+  const tags = await exiftool.readRaw(localFilePath, ['-G1', '-n']);
+  const {
+    'File:ColorComponents': colorComponents,
+    'ICC_Profile:ProfileDescription': profileDescription = null,
+    'IFD0:Orientation': orientation = null,
+    'MPF0:NumberOfImages': numberOfImages = 1,
+  } = tags;
+
+  return (
+    // 3-component image
+    colorComponents === 3 &&
+    // sRGB profile
+    (typeof profileDescription !== 'string' || profileDescription.startsWith('sRGB ')) &&
+    // Have only one image
+    (typeof numberOfImages !== 'number' || numberOfImages === 1) &&
+    // Have no rotation
+    (typeof orientation !== 'number' || orientation === 1)
+  );
 }
