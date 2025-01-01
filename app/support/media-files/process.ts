@@ -190,7 +190,7 @@ function tmpFileVariant(filePath: string, variant: string, ext: string): string 
  *
  * The image can be:
  *  1. Rotated
- *  2. Have a non-RGB colorspace
+ *  2. Have an exotic colorspace
  *  3. Have a non-sRGB color profile
  *  4. Have an additional image layer (HDR, etc.)
  *
@@ -203,17 +203,20 @@ async function canUseJpegOriginal(localFilePath: string): Promise<boolean> {
     'File:ColorComponents': colorComponents,
     'ICC_Profile:ProfileDescription': profileDescription = null,
     'IFD0:Orientation': orientation = null,
+    'IFD1:Orientation': previewOrientation = null,
     'MPF0:NumberOfImages': numberOfImages = 1,
   } = tags;
 
   return (
-    // 3-component image
-    colorComponents === 3 &&
+    // Only grayscale or rgb images
+    (colorComponents === 1 || colorComponents === 3) &&
     // sRGB profile
     (typeof profileDescription !== 'string' || profileDescription.startsWith('sRGB ')) &&
     // Have only one image
     (typeof numberOfImages !== 'number' || numberOfImages === 1) &&
     // Have no rotation
-    (typeof orientation !== 'number' || orientation === 1)
+    (typeof orientation !== 'number' || orientation === 1) &&
+    // Have no preview rotation
+    (typeof previewOrientation !== 'number' || previewOrientation === 1)
   );
 }

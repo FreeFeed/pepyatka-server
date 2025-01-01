@@ -210,20 +210,6 @@ const ATTACHMENT_COLUMNS_MAPPING = {
   noThumbnail: (no_thumbnail) => {
     return no_thumbnail === '1';
   },
-  postId: (post_id) => {
-    if (validator.isUUID(post_id)) {
-      return post_id;
-    }
-
-    return null;
-  },
-  userId: (user_id) => {
-    if (validator.isUUID(user_id)) {
-      return user_id;
-    }
-
-    return null;
-  },
   imageSizes: (image_sizes) => {
     return image_sizes ? JSON.stringify(image_sizes) : null;
   },

@@ -1,21 +1,18 @@
 /* eslint-env node, mocha */
 /* global $pg_database */
-import { promisify } from 'util';
-import { mkdtemp, rm, stat } from 'fs/promises';
+import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { basename, join } from 'path';
 
-import gmLib from 'gm';
 import { exiftool } from 'exiftool-vendored';
 import expect from 'unexpected';
 
 import cleanDB from '../../dbCleaner';
 import { User, Attachment } from '../../../app/models';
-
-const gm = gmLib.subClass({ imageMagick: true });
+import { spawnAsync } from '../../../app/support/spawn-async';
 
 const orientationNames = [
-  'Unknown', // No orientation tag
+  'Undefined', // No orientation tag
   'TopLeft', // 1: No changes
   'TopRight', // 2: Mirror horizontal
   'BottomRight', // 3: Rotate 180
@@ -46,49 +43,64 @@ describe('Orientation', () => {
         const filename = join(tmpDir, `img-${orientation}.jpg`);
 
         await createTestImage(filename, orientation);
-        const { size } = await stat(filename);
-        attachment = new Attachment({
-          file: {
-            path: filename,
-            size,
-            name: basename(filename),
-            type: 'image/jpeg',
-          },
-          userId: luna.id,
-        });
-        await attachment.create();
+        attachment = await Attachment.create(filename, basename(filename), luna);
       });
 
       it(`should create proper big file`, async () => {
-        const image = gm(attachment.getPath());
-        const o = await promisify(image.orientation.bind(image))();
-        expect(o, 'to be', orientation > 1 ? 'Unknown' : orientationNames[orientation]);
+        const variant = biggestVariant(attachment);
+        expect(variant, 'to be', orientation <= 1 ? '' : 'p1');
+        const filePath = attachment.getLocalFilePath(variant);
+        const o = await getOrientation(filePath);
+        expect(o, 'to be', orientation <= 1 ? orientationNames[orientation] : 'Undefined');
 
-        await expectOrientation(image, orientation);
+        await expectOrientation(filePath, orientation);
       });
 
       it(`should create proper thumbnail file`, async () => {
-        const image = gm(attachment.getResizedImagePath('t'));
-        const o = await promisify(image.orientation.bind(image))();
-        expect(o, 'to be', orientation > 1 ? 'Unknown' : orientationNames[orientation]);
+        const filePath = attachment.getLocalFilePath('thumbnails');
+        const o = await getOrientation(filePath);
+        expect(o, 'to be', 'Undefined');
 
-        await expectOrientation(image, orientation);
+        await expectOrientation(filePath, orientation);
       });
     });
   }
 });
+
+function biggestVariant(att) {
+  let maxWidth = 0;
+  let match = null;
+
+  for (const variant of Object.keys(att.previews.image)) {
+    if (att.previews.image[variant].w > maxWidth) {
+      maxWidth = att.previews.image[variant].width;
+      match = variant;
+    }
+  }
+
+  return match;
+}
+
+async function getOrientation(filename) {
+  const out = await spawnAsync('identify', ['-format', '%[orientation]', filename]);
+  return out.stdout;
+}
 
 /**
  * Create black 200x300 image with white to-left 100x100 corner and apply
  * orientation tag when it is not zero.
  */
 async function createTestImage(filename, orientation) {
-  const image = gm(200, 300, '#000000')
-    .fill('#ffffff')
-    .drawRectangle(0, 0, 100, 100)
-    .compress('JPEG');
-
-  await promisify(image.write.bind(image))(filename);
+  await spawnAsync('convert', [
+    '-size',
+    '200x300',
+    'xc:#000000',
+    '-fill',
+    '#ffffff',
+    '-draw',
+    'rectangle 0,0 100,100',
+    `jpeg:${filename}`,
+  ]);
 
   if (orientation !== 0) {
     await exiftool.write(
@@ -120,9 +132,12 @@ function patternForOrientation(orientation) {
   }
 }
 
-async function expectOrientation(image, orientation) {
-  image = image.filter('Point').resize(3, 3);
-  const buffer = await promisify(image.toBuffer.bind(image))('GRAY');
+async function expectOrientation(filePath, orientation) {
+  const { stdout: buffer } = await spawnAsync(
+    'convert',
+    [filePath, '-filter', 'Point', '-resize', '3x3', 'gray:-'],
+    { binary: true },
+  );
 
   const pattern = patternForOrientation(orientation);
   let newLine = '';

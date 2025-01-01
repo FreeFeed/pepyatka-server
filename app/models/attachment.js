@@ -202,7 +202,6 @@ export function addModel(dbAdapter) {
         sanitized,
         postId,
         userId: user.id,
-        imageSizes: JSON.stringify(mediaData.imageSizes || {}),
       };
 
       const id = await dbAdapter.createAttachment(params);
@@ -236,6 +235,14 @@ export function addModel(dbAdapter) {
      */
     getRelFilePath(variant, ext) {
       return `${currentConfig().attachments.path}${variant ? `${variant}/` : ''}${this.id}.${ext}`;
+    }
+
+    getLocalFilePath(variant, ext = null) {
+      if (ext === null) {
+        ext = this.allFileVariants().find(({ variant: v }) => v === variant)?.ext || 'unknown';
+      }
+
+      return currentConfig().attachments.storage.rootDir + this.getRelFilePath(variant, ext);
     }
 
     validate() {
@@ -579,14 +586,15 @@ export function addModel(dbAdapter) {
     /**
      * Get all file variants, including original (variant = '') and previews
      *
+     * @param {boolean} includeOriginal
      * @returns {{variant: string, ext: string}[]}
      */
-    allFileVariants() {
+    allFileVariants(includeOriginal = true) {
       const variants = Object.values(this.previews).flatMap((vars) =>
         Object.entries(vars).map(([variant, { ext }]) => ({ variant, ext })),
       );
 
-      if (!variants.some(({ variant }) => variant === '')) {
+      if (includeOriginal && !variants.some(({ variant }) => variant === '')) {
         variants.push({ variant: '', ext: this.fileExtension });
       }
 
@@ -596,10 +604,13 @@ export function addModel(dbAdapter) {
     /**
      * Get list of relative paths to attachment's files, including original and previews
      *
+     * @param {boolean} includeOriginal
      * @returns {string[]}
      */
-    allRelFilePaths() {
-      return this.allFileVariants().map(({ variant, ext }) => this.getRelFilePath(variant, ext));
+    allRelFilePaths(includeOriginal = true) {
+      return this.allFileVariants(includeOriginal).map(({ variant, ext }) =>
+        this.getRelFilePath(variant, ext),
+      );
     }
 
     async destroy() {
