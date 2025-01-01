@@ -195,7 +195,16 @@ export class Attachment {
   fileSize: number;
   sanitized: number;
   constructor(params: AttachmentParams);
-  create(): Promise<void>;
+  static create(
+    filePath: string,
+    fileName: string,
+    user: User,
+    postId: UUID | null,
+  ): Promise<Attachment>;
+  getRelFilePath(variant: string, ext: string): string;
+  getLocalFilePath(variant: string, ext?: string | null): string;
+  allFileVariants(includeOriginal?: boolean): { variant: string; ext: string }[];
+  allRelFilePaths(includeOriginal?: boolean): string[];
   downloadOriginal(): Promise<string>;
   sanitizeOriginal(): Promise<boolean>;
   destroy(destroyedBy?: User): Promise<void>;
