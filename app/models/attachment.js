@@ -298,7 +298,7 @@ export function addModel(dbAdapter) {
 
     // Get local filesystem path for original file
     getPath() {
-      return config.attachments.storage.rootDir + config.attachments.path + this.getFilename();
+      return this.getLocalFilePath('', this.fileExtension);
     }
 
     getResizedImageExtension() {
@@ -667,7 +667,7 @@ export function addModel(dbAdapter) {
 
       if (type === 's3') {
         const { Body } = await s3Client().getObject({
-          Key: config.attachments.path + this.getFilename(),
+          Key: this.getRelFilePath('', this.fileExtension),
           Bucket: bucket,
         });
 
@@ -677,7 +677,7 @@ export function addModel(dbAdapter) {
 
         await fs.writeFile(localFile, Body);
       } else {
-        const filePath = this.getPath();
+        const filePath = this.getLocalFilePath('', this.fileExtension);
         await fs.copyFile(filePath, localFile);
       }
 
@@ -739,11 +739,11 @@ export function addModel(dbAdapter) {
         if (currentConfig().attachments.storage.type === 's3') {
           await this.uploadToS3(
             localFile,
-            config.attachments.path + this.getFilename(),
+            this.getRelFilePath('', this.fileExtension),
             this.mimeType,
           );
         } else {
-          await mvAsync(localFile, this.getPath(), {});
+          await mvAsync(localFile, this.getLocalFilePath('', this.fileExtension), {});
         }
 
         return true;
