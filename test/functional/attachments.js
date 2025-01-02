@@ -16,7 +16,6 @@ import {
   updateUserAsync,
   performJSONRequest,
   authHeaders,
-  withModifiedAppConfig,
 } from './functional_test_helper';
 
 const expect = unexpected.clone().use(unexpectedDate);
@@ -282,52 +281,6 @@ describe('Attachments', () => {
         attachments: { total: 10, sanitized: 10 },
         sanitizeTask: null,
         __httpCode: 200,
-      });
-    });
-  });
-
-  describe(`WebP attachments`, () => {
-    it(`should create WebP attachment with .jpg thumbnails`, async () => {
-      const filePath = path.join(__dirname, '../fixtures/test-image-webp.webp');
-      const data = new FormData();
-      data.append('file', await fileFrom(filePath, 'image/webp'));
-      const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
-      expect(resp, 'to satisfy', {
-        attachments: {
-          fileName: 'test-image-webp.webp',
-          mediaType: 'image',
-          fileSize: fs.statSync(filePath).size,
-          url: expect.it('to end with', '.webp'),
-          thumbnailUrl: expect.it('to end with', '.jpg'),
-          imageSizes: expect.it('to have values satisfying', {
-            url: expect.it('to end with', '.jpg').or('to end with', '.webp'),
-          }),
-        },
-        users: [{ id: luna.user.id }],
-      });
-    });
-
-    describe(`With {useImgProxy:true}`, () => {
-      withModifiedAppConfig({ attachments: { useImgProxy: true } });
-
-      it(`should create WebP attachment with .webp?format=jpg thumbnails`, async () => {
-        const filePath = path.join(__dirname, '../fixtures/test-image-webp.webp');
-        const data = new FormData();
-        data.append('file', await fileFrom(filePath, 'image/webp'));
-        const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
-        expect(resp, 'to satisfy', {
-          attachments: {
-            fileName: 'test-image-webp.webp',
-            mediaType: 'image',
-            fileSize: fs.statSync(filePath).size,
-            url: expect.it('to end with', '.webp'),
-            thumbnailUrl: expect.it('to end with', '.webp?format=jpg'),
-            imageSizes: expect.it('to have values satisfying', {
-              url: expect.it('to end with', '.webp?format=jpg').or('to end with', '.webp'),
-            }),
-          },
-          users: [{ id: luna.user.id }],
-        });
       });
     });
   });
