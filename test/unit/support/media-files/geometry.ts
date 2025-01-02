@@ -7,10 +7,11 @@ describe('media-files:geometry', () => {
   it('should generate preview sizes for large image', () => {
     const result = getImagePreviewSizes({ width: 6000, height: 4000 });
     expect(result, 'to equal', [
-      { variant: 'p3', width: 2449, height: 1633 },
-      { variant: 'p2', width: 1225, height: 816 },
-      { variant: 'p1', width: 612, height: 408 },
+      { variant: 'p4', width: 2449, height: 1633 },
+      { variant: 'p3', width: 1342, height: 894 },
+      { variant: 'p2', width: 775, height: 516 },
       { variant: 'thumbnails2', width: 525, height: 350 },
+      { variant: 'p1', width: 424, height: 283 },
       { variant: 'thumbnails', width: 263, height: 175 },
     ]);
   });
@@ -18,10 +19,11 @@ describe('media-files:geometry', () => {
   it('should generate preview sizes for image that is slightly bigger than maximum of preset sizes', () => {
     const result = getImagePreviewSizes({ width: 2700, height: 1800 });
     expect(result, 'to equal', [
-      { variant: 'p3', width: 2700, height: 1800 },
-      { variant: 'p2', width: 1225, height: 816 },
-      { variant: 'p1', width: 612, height: 408 },
+      { variant: 'p4', width: 2700, height: 1800 },
+      { variant: 'p3', width: 1342, height: 894 },
+      { variant: 'p2', width: 775, height: 516 },
       { variant: 'thumbnails2', width: 525, height: 350 },
+      { variant: 'p1', width: 424, height: 283 },
       { variant: 'thumbnails', width: 263, height: 175 },
     ]);
   });
@@ -29,9 +31,10 @@ describe('media-files:geometry', () => {
   it('should generate preview sizes for medium size image', () => {
     const result = getImagePreviewSizes({ width: 1500, height: 1000 });
     expect(result, 'to equal', [
-      { variant: 'p2', width: 1500, height: 1000 },
-      { variant: 'p1', width: 612, height: 408 },
+      { variant: 'p3', width: 1500, height: 1000 },
+      { variant: 'p2', width: 775, height: 516 },
       { variant: 'thumbnails2', width: 525, height: 350 },
+      { variant: 'p1', width: 424, height: 283 },
       { variant: 'thumbnails', width: 263, height: 175 },
     ]);
   });
