@@ -172,10 +172,11 @@ describe('Attachments', () => {
 
       for (let i = 0; i < 10; i++) {
         const data = new FormData();
-        data.append('file', new Blob(['this is a test']), {
-          filename: `test${i + 1}.txt`,
-          contentType: 'text/plain',
-        });
+        data.append(
+          'file',
+          new Blob(['this is a test'], { type: 'text/plain' }),
+          `test${i + 1}.txt`,
+        );
         // eslint-disable-next-line no-await-in-loop
         await performJSONRequest('POST', '/v1/attachments', data, authHeaders(mars));
       }
@@ -210,10 +211,11 @@ describe('Attachments', () => {
 
       for (let i = 0; i < 10; i++) {
         const data = new FormData();
-        data.append('file', new Blob(['this is a test']), {
-          filename: `test${i + 1}.txt`,
-          contentType: 'text/plain',
-        });
+        data.append(
+          'file',
+          new Blob(['this is a test'], { type: 'text/plain' }),
+          `test${i + 1}.txt`,
+        );
         // eslint-disable-next-line no-await-in-loop
         await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
       }
