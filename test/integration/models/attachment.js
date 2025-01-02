@@ -16,12 +16,10 @@ import { createPost } from '../helpers/posts-and-comments';
 import { spawnAsync } from '../../../app/support/spawn-async';
 import { withModifiedConfig } from '../../helpers/with-modified-config';
 
-import { FakeS3 } from './fake-s3';
 import { testFiles } from './attachment-data';
+import { fakeS3Storage } from './fake-s3';
 
 const fixturesDir = resolve(__dirname, '../../fixtures');
-
-const fakeS3 = new FakeS3();
 
 describe('Attachments', () => {
   before(() => cleanDB(dbAdapter.database));
@@ -47,7 +45,7 @@ describe('Attachments', () => {
     );
   });
 
-  beforeEach(() => fakeS3.clear());
+  beforeEach(() => fakeS3Storage.clear());
 
   let post;
 
@@ -383,14 +381,16 @@ describe('Attachments', () => {
   });
 
   describe('S3 storage', () => {
+    const storageConfig = {
+      type: 's3',
+      region: 'fake',
+      accessKeyId: 'foo',
+      secretAccessKey: 'bar',
+      bucket: 'bucket',
+    };
     withModifiedConfig({
-      attachments: {
-        storage: {
-          type: 's3',
-          bucket: 'bucket-name',
-          s3Client: fakeS3,
-        },
-      },
+      media: { storage: storageConfig },
+      attachments: { storage: storageConfig },
     });
 
     it('should create a small attachment on S3', () =>
@@ -440,8 +440,8 @@ async function createAndCheckAttachment(fileObject, post, user) {
   if (currentConfig().attachments.storage.type === 's3') {
     // Original should be uploaded
     const origKey = att.getRelFilePath('', att.fileExtension);
-    expect(fakeS3.items.has(origKey), 'to be truthy');
-    expect(fakeS3.items.get(origKey), 'to satisfy', {
+    expect(fakeS3Storage.has(origKey), 'to be truthy');
+    expect(fakeS3Storage.get(origKey), 'to satisfy', {
       ACL: 'public-read',
       Bucket: currentConfig().attachments.storage.bucket,
       Key: origKey,
@@ -450,18 +450,18 @@ async function createAndCheckAttachment(fileObject, post, user) {
     });
 
     if (fileObject.size) {
-      expect(fakeS3.items.get(origKey).Body, 'to have length', fileObject.size);
+      expect(fakeS3Storage.get(origKey).Body, 'to have length', fileObject.size);
     } else {
       // Just checking for not-zero size
-      expect(fakeS3.items.get(origKey).Body, 'to be non-empty');
+      expect(fakeS3Storage.get(origKey).Body, 'to be non-empty');
     }
 
     // All previews should be uploaded
     for (const { variant, ext } of att.allFileVariants()) {
       const previewKey = att.getRelFilePath(variant, ext);
       const dispositionName = `${parsePath(att.fileName).name}.${ext}`;
-      expect(fakeS3.items.has(previewKey), 'to be truthy');
-      expect(fakeS3.items.get(previewKey), 'to satisfy', {
+      expect(fakeS3Storage.has(previewKey), 'to be truthy');
+      expect(fakeS3Storage.get(previewKey), 'to satisfy', {
         ACL: 'public-read',
         Bucket: currentConfig().attachments.storage.bucket,
         Key: previewKey,
@@ -518,9 +518,9 @@ function filesMustExist(attachment, mustExist = true) {
 
 function filesMustExistOnS3(attachment, mustExist = true) {
   for (const p of attachment.allRelFilePaths()) {
-    if (!mustExist && fakeS3.items.has(p)) {
+    if (!mustExist && fakeS3Storage.has(p)) {
       throw new Error(`File should not exist: ${p}`);
-    } else if (mustExist && !fakeS3.items.has(p)) {
+    } else if (mustExist && !fakeS3Storage.has(p)) {
       throw new Error(`File should exist: ${p}`);
     }
   }

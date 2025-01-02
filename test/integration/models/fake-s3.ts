@@ -12,8 +12,16 @@ type S3DeleteParams = {
 
 type S3UploadCbParams = Omit<S3UploadParams, 'Body'> & { Body: Buffer };
 
+export type FakeS3Storage = Map<string, S3UploadCbParams>;
+
+export const fakeS3Storage: FakeS3Storage = new Map();
+
 export class FakeS3 {
-  public readonly items = new Map<string, S3UploadCbParams>();
+  public readonly storage: FakeS3Storage;
+
+  constructor(storage: FakeS3Storage = fakeS3Storage) {
+    this.storage = storage;
+  }
 
   putObject(params: S3UploadParams): Promise<void> {
     return new Promise((resolve) => {
@@ -22,18 +30,14 @@ export class FakeS3 {
 
       params.Body.on('end', () => {
         const Body = Buffer.concat(chunks);
-        this.items.set(params.Key, { ...params, Body });
+        this.storage.set(params.Key, { ...params, Body });
         resolve();
       });
     });
   }
 
   deleteObject(params: S3DeleteParams): Promise<void> {
-    this.items.delete(params.Key);
+    this.storage.delete(params.Key);
     return Promise.resolve();
-  }
-
-  clear() {
-    this.items.clear();
   }
 }

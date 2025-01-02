@@ -11,7 +11,7 @@ import validator from 'validator';
 import { v4 as uuidv4 } from 'uuid';
 import config from 'config';
 
-import { getS3 } from '../support/s3';
+import { s3Client } from '../support/s3';
 import { BadRequestException, NotFoundException, ValidationException } from '../support/exceptions';
 import { Attachment, Comment, Post, PubSub as pubSub } from '../models';
 import { EventService } from '../support/EventService';
@@ -1016,8 +1016,7 @@ export function addModel(dbAdapter) {
 
     // Upload profile picture to the S3 bucket
     async uploadToS3(sourceFile, destFile, subConfig) {
-      const s3 = getS3(subConfig.storage);
-      await s3.putObject({
+      await s3Client().putObject({
         ACL: 'public-read',
         Bucket: subConfig.storage.bucket,
         Key: subConfig.path + destFile,

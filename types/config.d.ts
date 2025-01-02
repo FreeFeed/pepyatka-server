@@ -1,5 +1,3 @@
-import { type S3 } from '@aws-sdk/client-s3';
-
 // We cannot use regular 'import' in the ambient module
 type ISO8601DurationString = import('../app/support/types').ISO8601DurationString;
 type InvitationCreationCriterion =
@@ -20,9 +18,14 @@ declare module 'config' {
     proxyIpHeader: string;
     logResponseTime: boolean;
     adminEmail: string;
-    media: { supportedExtensions: string[] };
+    media: {
+      url: string;
+      storage: MediaStorage;
+      supportedExtensions: string[];
+    };
     attachments: {
       url: string;
+      storage: MediaStorage;
       path: string;
       fileSizeLimit: number;
       maxCount: number;
@@ -36,20 +39,6 @@ declare module 'config' {
           };
         }
       >;
-      storage:
-        | {
-            type: 'fs';
-            rootDir: string;
-          }
-        | {
-            type: 's3';
-            accessKeyId: string;
-            secretAccessKey: string;
-            bucket: string;
-            region: string;
-            s3ConfigOptions: Record<string, unknown>;
-            s3Client: S3;
-          };
       sanitizeMetadata: {
         removeTags: RegExp[];
         ignoreTags: RegExp[];
@@ -237,6 +226,20 @@ declare module 'config' {
     };
     nonVisualPreviewTypes: string[];
   };
+
+  export type MediaStorage =
+    | {
+        type: 'fs';
+        rootDir: string;
+      }
+    | {
+        type: 's3';
+        accessKeyId: string;
+        secretAccessKey: string;
+        bucket: string;
+        region: string;
+        s3ConfigOptions: Record<string, unknown>;
+      };
 
   const c: Config;
   export default c;

@@ -3,8 +3,6 @@ import fs from 'fs';
 import smtpTransport from 'nodemailer-smtp-transport';
 import { deferConfig as defer } from 'config/defer';
 
-import { getS3 } from '../app/support/s3';
-
 const stubTransport = function () {
   return {
     name: 'minimal',
@@ -121,14 +119,6 @@ config.media = {
     region: 'eu-west-1',
     // endpoint:        'nyc3.digitaloceanspaces.com',
     s3ConfigOptions: {},
-
-    s3Client: defer((cfg) => {
-      if (cfg.media.storage.type === 's3') {
-        return getS3(cfg.media.storage);
-      }
-
-      return null;
-    }),
   },
   // Files of these types are uplodes to S3 with 'Content-Disposition: inline'.
   // All other types will have 'Content-Disposition: attachment' to prevent

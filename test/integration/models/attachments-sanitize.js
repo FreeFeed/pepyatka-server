@@ -12,6 +12,7 @@ import S3rver from 's3rver';
 import { User } from '../../../app/models';
 import cleanDB from '../../dbCleaner';
 import { SANITIZE_NONE, SANITIZE_VERSION } from '../../../app/support/sanitize-media';
+import { withModifiedConfig } from '../../helpers/with-modified-config';
 
 import { createAttachment } from './attachment-helpers';
 
@@ -134,6 +135,12 @@ describe('sanitizeOriginal model method', () => {
       endpoint: 'http://localhost:4569',
       s3ConfigOptions: { forcePathStyle: true },
     };
+
+    withModifiedConfig({
+      media: { storage: storageConfig },
+      attachments: { storage: storageConfig },
+    });
+
     before(async () => {
       s3instance = new S3rver({
         port: 4569,

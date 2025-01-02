@@ -1,31 +1,22 @@
 import path from 'path';
 import os from 'os';
-import { promises as fs } from 'fs';
+import { writeFile } from 'fs/promises';
 
 import { UUID } from '../../../app/support/types';
-import { Attachment } from '../../../app/models';
+import { Attachment, dbAdapter } from '../../../app/models';
 
 type FileInfo = {
   name: string;
-  type: string;
   content: string | Uint8Array;
 };
 
-export async function createAttachment(
-  userId: UUID,
-  { name, type = 'application/octet-stream', content }: FileInfo,
-  additionalParams = {},
-) {
+export async function createAttachment(userId: UUID, { name, content }: FileInfo) {
   const localPath = path.join(
     os.tmpdir(),
     `attachment${(Math.random() * 0x100000000 + 1).toString(36)}`,
   );
-  await fs.writeFile(localPath, content);
-  const attachment = new Attachment({
-    ...additionalParams,
-    file: { name, type, size: content.length, path: localPath },
-    userId,
-  });
-  await attachment.create();
+  await writeFile(localPath, content);
+  const user = await dbAdapter.getUserById(userId);
+  const attachment = await Attachment.create(localPath, name, user!, null);
   return attachment;
 }

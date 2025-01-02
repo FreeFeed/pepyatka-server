@@ -16,7 +16,7 @@ import probe from 'probe-image-size';
 import Raven from 'raven';
 import { exiftool } from 'exiftool-vendored';
 
-import { getS3 } from '../support/s3';
+import { s3Client } from '../support/s3';
 import { sanitizeMediaMetadata, SANITIZE_NONE, SANITIZE_VERSION } from '../support/sanitize-media';
 import { processMediaFile } from '../support/media-files/process';
 import { currentConfig } from '../support/app-async-context';
@@ -102,11 +102,6 @@ export function addModel(dbAdapter) {
       if (parseInt(params.updatedAt, 10)) {
         this.updatedAt = params.updatedAt;
       }
-
-      const storageConfig = params.storageConfig || config.attachments.storage;
-
-      this.s3 = storageConfig.type === 's3' ? getS3(storageConfig) : null;
-      this.s3bucket = storageConfig.type === 's3' ? storageConfig.bucket : null;
     }
 
     get previews() {
@@ -551,13 +546,13 @@ export function addModel(dbAdapter) {
 
     // Upload original attachment or its thumbnail to the S3 bucket
     async uploadToS3(sourceFile, destPath) {
-      const storageConfig = currentConfig().attachments.storage;
+      const { bucket } = currentConfig().attachments.storage;
       const dispositionName = parsePath(this.fileName).name + parsePath(destPath).ext;
       const mimeType = mime.lookup(dispositionName) || 'application/octet-stream';
 
-      await storageConfig.s3Client.putObject({
+      await s3Client().putObject({
         ACL: 'public-read',
-        Bucket: storageConfig.bucket,
+        Bucket: bucket,
         Key: destPath,
         Body: createReadStream(sourceFile),
         ContentType: mimeType,
@@ -630,7 +625,7 @@ export function addModel(dbAdapter) {
         await Promise.all(
           keys.map(async (Key) => {
             try {
-              await storageConfig.s3Client.deleteObject({
+              await s3Client().deleteObject({
                 Key,
                 Bucket: storageConfig.bucket,
               });
@@ -666,10 +661,12 @@ export function addModel(dbAdapter) {
     async downloadOriginal() {
       const localFile = join(os.tmpdir(), `${this.id}.orig`);
 
-      if (this.s3) {
-        const { Body } = await this.s3.getObject({
+      const { type, bucket } = currentConfig().attachments.storage;
+
+      if (type === 's3') {
+        const { Body } = await s3Client().getObject({
           Key: config.attachments.path + this.getFilename(),
-          Bucket: this.s3bucket,
+          Bucket: bucket,
         });
 
         if (!Body) {
@@ -720,6 +717,8 @@ export function addModel(dbAdapter) {
             this.sanitized = updAtt.sanitized;
           }
 
+          await fs.unlink(localFile);
+
           return false;
         }
 
@@ -734,7 +733,8 @@ export function addModel(dbAdapter) {
         this.fileSize = updAtt.fileSize;
 
         // Uploading
-        if (this.s3) {
+
+        if (currentConfig().attachments.storage.type === 's3') {
           await this.uploadToS3(
             localFile,
             config.attachments.path + this.getFilename(),
