@@ -13,7 +13,7 @@ import config from 'config';
 
 import { s3Client } from '../support/s3';
 import { BadRequestException, NotFoundException, ValidationException } from '../support/exceptions';
-import { Attachment, Comment, Post, PubSub as pubSub } from '../models';
+import { Comment, Post, PubSub as pubSub } from '../models';
 import { EventService } from '../support/EventService';
 import { userCooldownStart, userDataDeletionStart } from '../jobs/user-gone';
 import { allExternalProviders } from '../support/ExtAuth';
@@ -938,12 +938,6 @@ export function addModel(dbAdapter) {
       attrs.userId = this.id;
       monitor.increment('users.comments');
       return new Comment(attrs);
-    }
-
-    newAttachment(attrs) {
-      attrs.userId = this.id;
-      monitor.increment('users.attachments');
-      return new Attachment(attrs);
     }
 
     async updateProfilePicture(filePath) {

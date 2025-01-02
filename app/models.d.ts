@@ -199,7 +199,7 @@ export class Attachment {
     filePath: string,
     fileName: string,
     user: User,
-    postId: UUID | null,
+    postId?: UUID | null,
   ): Promise<Attachment>;
   getRelFilePath(variant: string, ext: string): string;
   getLocalFilePath(variant: string, ext?: string | null): string;

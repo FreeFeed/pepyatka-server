@@ -15,6 +15,7 @@ import gifsicle from 'gifsicle';
 import probe from 'probe-image-size';
 import Raven from 'raven';
 import { exiftool } from 'exiftool-vendored';
+import monitor from 'monitor-dog';
 
 import { s3Client } from '../support/s3';
 import { sanitizeMediaMetadata, SANITIZE_NONE, SANITIZE_VERSION } from '../support/sanitize-media';
@@ -220,6 +221,7 @@ export function addModel(dbAdapter) {
         }),
       );
 
+      monitor.increment('users.attachments');
       return object;
     }
 
