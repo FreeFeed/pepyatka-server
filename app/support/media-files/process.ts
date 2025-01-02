@@ -63,7 +63,11 @@ export async function processMediaFile(
     };
   }
 
-  return { mediaType: 'general', ...commonResult };
+  return {
+    mediaType: 'general',
+    ...commonResult,
+    files: { '': { path: localFilePath, ext: info.extension } },
+  };
 }
 
 async function processImage(
