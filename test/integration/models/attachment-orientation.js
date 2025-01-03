@@ -47,7 +47,7 @@ describe('Orientation', () => {
       });
 
       it(`should create proper big file`, async () => {
-        const variant = biggestVariant(attachment);
+        const variant = attachment.maxSizedVariant('image');
         expect(variant, 'to be', orientation <= 1 ? '' : 'p1');
         const filePath = attachment.getLocalFilePath(variant);
         const o = await getOrientation(filePath);
@@ -66,20 +66,6 @@ describe('Orientation', () => {
     });
   }
 });
-
-function biggestVariant(att) {
-  let maxWidth = 0;
-  let match = null;
-
-  for (const variant of Object.keys(att.previews.image)) {
-    if (att.previews.image[variant].w > maxWidth) {
-      maxWidth = att.previews.image[variant].width;
-      match = variant;
-    }
-  }
-
-  return match;
-}
 
 async function getOrientation(filename) {
   const out = await spawnAsync('identify', ['-format', '%[orientation]', filename]);
