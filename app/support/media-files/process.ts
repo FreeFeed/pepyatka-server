@@ -34,6 +34,7 @@ export async function processMediaFile(
     fileSize: fileStat.size,
     fileName: origFileName,
     mimeType: mimeLookup(info.extension) || 'application/octet-stream',
+    meta: {},
   };
 
   if (info.type === 'image') {

@@ -189,6 +189,7 @@ const ATTACHMENT_COLUMNS = {
   postId: 'post_id',
   sanitized: 'sanitized',
   previews: 'previews',
+  meta: 'meta',
 };
 
 const ATTACHMENT_COLUMNS_MAPPING = {
@@ -212,6 +213,9 @@ const ATTACHMENT_COLUMNS_MAPPING = {
   previews: (previews) => {
     return previews ? JSON.stringify(previews) : null;
   },
+  meta: (meta) => {
+    return meta ? JSON.stringify(meta) : null;
+  },
 };
 
 export const ATTACHMENT_FIELDS = {
@@ -230,6 +234,7 @@ export const ATTACHMENT_FIELDS = {
   post_id: 'postId',
   sanitized: 'sanitized',
   previews: 'previews',
+  meta: 'meta',
 };
 
 const ATTACHMENT_FIELDS_MAPPING = {

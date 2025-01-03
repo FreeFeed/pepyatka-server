@@ -48,8 +48,8 @@ function serializeAttachmentV3(att) {
   }
 
   if (att.mediaType === 'audio') {
-    result.artist = att.artist;
-    result.title = att.title;
+    result.artist = att.meta['dc:creator'];
+    result.title = att.meta['dc:title'];
   }
 
   return result;

@@ -58,6 +58,7 @@ describe('Attachments', () => {
     expect(att.previews, 'to equal', {
       image: { '': { h: 150, w: 150, ext: 'png' } },
     });
+    expect(att.meta, 'to equal', {});
   });
 
   it('should create a medium attachment', async () => {
@@ -255,7 +256,10 @@ describe('Attachments', () => {
         '': { ext: 'mp3' },
       },
     });
-    // TODO check music metadata
+    expect(att.meta, 'to equal', {
+      'dc:title': 'Improvisation with Sopranino Recorder',
+      'dc:creator': 'Piermic',
+    });
   });
 
   it('should create an M4A audio attachment', async () => {

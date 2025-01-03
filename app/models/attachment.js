@@ -31,9 +31,10 @@ export function addModel(dbAdapter) {
 
       this._imageSizes = params.imageSizes; // pixel sizes of thumbnail(s) and original image, e.g. {t: {w: 200, h: 175}, o: {w: 600, h: 525}}
       this._previews = params.previews;
+      this._meta = params.meta;
 
-      this.artist = params.artist; // filled only for audio
-      this.title = params.title; // filled only for audio
+      this._artist = params.artist; // filled only for audio
+      this._title = params.title; // filled only for audio
 
       this.userId = params.userId;
       this.postId = params.postId;
@@ -50,6 +51,14 @@ export function addModel(dbAdapter) {
       }
 
       return this._previews;
+    }
+
+    get meta() {
+      if (!this._meta) {
+        this._meta = this.getMetaDataForLegacyFile();
+      }
+
+      return this._meta;
     }
 
     getPreviewsDataForLegacyFile() {
@@ -83,6 +92,22 @@ export function addModel(dbAdapter) {
         result.audio = {
           '': { ext: this.fileExtension },
         };
+      }
+
+      return result;
+    }
+
+    getMetaDataForLegacyFile() {
+      const result = {};
+
+      if (this.mediaType === 'audio') {
+        if (this._title) {
+          result['dc:title'] = this._title;
+        }
+
+        if (this._artist) {
+          result['dc:creator'] = this._artist;
+        }
       }
 
       return result;

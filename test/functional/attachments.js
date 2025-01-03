@@ -142,6 +142,32 @@ describe('Attachments', () => {
     });
   });
 
+  it(`should create mp3 audio attachment`, async () => {
+    const filePath = path.join(__dirname, '../fixtures/media-files/music.mp3');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'audio/mpeg'));
+    const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'music.mp3',
+        mediaType: 'audio',
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'mp3'),
+        thumbnailUrl: attObj.getFileUrl('', 'mp3'),
+        imageSizes: {},
+        createdBy: luna.user.id,
+        postId: null,
+        artist: 'Piermic',
+        title: 'Improvisation with Sopranino Recorder',
+      },
+      users: [{ id: luna.user.id }],
+    });
+  });
+
   it(`should create attachment from any binary form field`, async () => {
     const data = new FormData();
     data.append('name', 'john');
