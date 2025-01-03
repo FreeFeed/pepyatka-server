@@ -193,19 +193,19 @@ const ATTACHMENT_COLUMNS = {
 };
 
 const ATTACHMENT_COLUMNS_MAPPING = {
+  /**
+   * @param {Date|null|'now'} timestamp
+   * @returns {string|null}
+   */
   createdAt: (timestamp) => {
-    const d = new Date();
-    d.setTime(timestamp);
-    return d.toISOString();
+    return timestamp instanceof Date ? timestamp.toISOString() : timestamp;
   },
+  /**
+   * @param {Date|null|'now'} timestamp
+   * @returns {string|null}
+   */
   updatedAt: (timestamp) => {
-    if (timestamp === 'now') {
-      return timestamp;
-    }
-
-    const d = new Date();
-    d.setTime(timestamp);
-    return d.toISOString();
+    return timestamp instanceof Date ? timestamp.toISOString() : timestamp;
   },
   noThumbnail: (no_thumbnail) => {
     return no_thumbnail === '1';

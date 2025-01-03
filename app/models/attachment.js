@@ -226,7 +226,7 @@ export function addModel(dbAdapter) {
      * @return {string}
      */
     getRelFilePath(variant, ext) {
-      return `${currentConfig().attachments.path}${variant ? `${variant}/` : ''}${this.id}.${ext}`;
+      return `${currentConfig().attachments.path}${variant ? `${variant}/` : ''}${this.id}${ext ? `.${ext}` : ''}`;
     }
 
     getLocalFilePath(variant, ext = null) {
