@@ -238,23 +238,11 @@ export const ATTACHMENT_FIELDS = {
 };
 
 const ATTACHMENT_FIELDS_MAPPING = {
-  created_at: (time) => {
-    return time.getTime().toString();
-  },
-  updated_at: (time) => {
-    return time.getTime().toString();
-  },
   no_thumbnail: (no_thumbnail) => {
     return no_thumbnail ? '1' : '0';
   },
   file_size: (file_size) => {
     return file_size && parseInt(file_size);
-  },
-  post_id: (post_id) => {
-    return post_id ? post_id : '';
-  },
-  user_id: (user_id) => {
-    return user_id ? user_id : '';
   },
   image_sizes: (image_sizes) => {
     return image_sizes ? JSON.parse(image_sizes) : '';

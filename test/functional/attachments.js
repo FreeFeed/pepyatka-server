@@ -44,26 +44,99 @@ describe('Attachments', () => {
     const data = new FormData();
     data.append('file', new Blob(['this is a test'], { type: 'text/plain' }), 'test.txt');
     const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
     expect(resp, 'to satisfy', {
       attachments: {
         fileName: 'test.txt',
         mediaType: 'general',
-        fileSize: 'this is a test'.length,
+        fileSize: 'this is a test'.length.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'txt'),
+        thumbnailUrl: attObj.getFileUrl('', 'txt'),
+        imageSizes: {},
+        createdBy: luna.user.id,
+        postId: null,
       },
       users: [{ id: luna.user.id }],
     });
   });
 
-  it(`should create image attachment`, async () => {
+  it(`should create small image attachment`, async () => {
     const filePath = path.join(__dirname, '../fixtures/test-image.150x150.png');
     const data = new FormData();
     data.append('file', await fileFrom(filePath, 'image/png'));
     const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
     expect(resp, 'to satisfy', {
       attachments: {
         fileName: 'test-image.150x150.png',
         mediaType: 'image',
-        fileSize: fs.statSync(filePath).size,
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'png'),
+        thumbnailUrl: attObj.getFileUrl('', 'png'),
+        imageSizes: { o: { w: 150, h: 150, url: attObj.getFileUrl('', 'png') } },
+        createdBy: luna.user.id,
+        postId: null,
+      },
+      users: [{ id: luna.user.id }],
+    });
+  });
+
+  it(`should create medium image attachment`, async () => {
+    const filePath = path.join(__dirname, '../fixtures/test-image.900x300.png');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'image/png'));
+    const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'test-image.900x300.png',
+        mediaType: 'image',
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'png'),
+        thumbnailUrl: attObj.getFileUrl('thumbnails', 'webp'),
+        imageSizes: {
+          o: { w: 900, h: 300, url: attObj.getFileUrl('', 'png') },
+          t: { w: 525, h: 175, url: attObj.getFileUrl('thumbnails', 'webp') },
+        },
+        createdBy: luna.user.id,
+        postId: null,
+      },
+      users: [{ id: luna.user.id }],
+    });
+  });
+
+  it(`should create large image attachment`, async () => {
+    const filePath = path.join(__dirname, '../fixtures/test-image.3000x2000.png');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'image/png'));
+    const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'test-image.3000x2000.png',
+        mediaType: 'image',
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'png'),
+        thumbnailUrl: attObj.getFileUrl('thumbnails', 'webp'),
+        imageSizes: {
+          o: { w: 2449, h: 1633, url: attObj.getFileUrl('p4', 'webp') },
+          t: { w: 263, h: 175, url: attObj.getFileUrl('thumbnails', 'webp') },
+          t2: { w: 525, h: 350, url: attObj.getFileUrl('thumbnails2', 'webp') },
+        },
+        createdBy: luna.user.id,
+        postId: null,
       },
       users: [{ id: luna.user.id }],
     });
@@ -82,7 +155,7 @@ describe('Attachments', () => {
       attachments: {
         fileName: 'test.txt',
         mediaType: 'general',
-        fileSize: 'this is a test'.length,
+        fileSize: 'this is a test'.length.toString(),
       },
       users: [{ id: luna.user.id }],
     });

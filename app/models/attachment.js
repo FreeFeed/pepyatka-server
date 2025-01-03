@@ -96,13 +96,8 @@ export function addModel(dbAdapter) {
 
       this.sanitized = params.sanitized || SANITIZE_NONE;
 
-      if (parseInt(params.createdAt, 10)) {
-        this.createdAt = params.createdAt;
-      }
-
-      if (parseInt(params.updatedAt, 10)) {
-        this.updatedAt = params.updatedAt;
-      }
+      this.createdAt = params.createdAt;
+      this.updatedAt = params.updatedAt;
     }
 
     get previews() {
@@ -240,6 +235,14 @@ export function addModel(dbAdapter) {
       }
 
       return currentConfig().attachments.storage.rootDir + this.getRelFilePath(variant, ext);
+    }
+
+    getFileUrl(variant, ext = null) {
+      if (ext === null) {
+        ext = this.allFileVariants().find(({ variant: v }) => v === variant)?.ext || 'unknown';
+      }
+
+      return currentConfig().attachments.url + this.getRelFilePath(variant, ext);
     }
 
     validate() {

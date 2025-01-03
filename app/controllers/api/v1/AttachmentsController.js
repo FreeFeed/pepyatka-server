@@ -3,7 +3,7 @@ import compose from 'koa-compose';
 import { isInt } from 'validator';
 
 import { reportError, BadRequestException, ValidationException } from '../../../support/exceptions';
-import { serializeAttachment } from '../../../serializers/v2/post';
+import { serializeAttachment } from '../../../serializers/v2/attachment';
 import { serializeUsersByIds } from '../../../serializers/v2/user';
 import { authRequired } from '../../middlewares';
 import { dbAdapter, Attachment } from '../../../models';

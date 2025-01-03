@@ -203,6 +203,7 @@ export class Attachment {
   ): Promise<Attachment>;
   getRelFilePath(variant: string, ext: string): string;
   getLocalFilePath(variant: string, ext?: string | null): string;
+  getFileUrl(variant: string, ext?: string | null): string;
   allFileVariants(includeOriginal?: boolean): { variant: string; ext: string }[];
   allRelFilePaths(includeOriginal?: boolean): string[];
   downloadOriginal(): Promise<string>;
