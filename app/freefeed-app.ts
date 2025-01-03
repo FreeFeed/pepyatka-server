@@ -97,7 +97,9 @@ class FreefeedApp extends Application<DefaultState, AppContext> {
     this.use(responseTime());
     this.use(koaServerTiming());
 
-    this.use(koaStatic(`${__dirname}/../${config.attachments.storage.rootDir}`));
+    if (config.attachments.storage.type === 'fs') {
+      this.use(koaStatic(`${__dirname}/../${config.attachments.storage.rootDir}`));
+    }
 
     this.use(maintenanceCheck);
 

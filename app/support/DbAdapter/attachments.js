@@ -182,7 +182,6 @@ const ATTACHMENT_COLUMNS = {
   mimeType: 'mime_type',
   mediaType: 'media_type',
   fileExtension: 'file_extension',
-  noThumbnail: 'no_thumbnail',
   imageSizes: 'image_sizes',
   artist: 'artist',
   title: 'title',
@@ -207,9 +206,6 @@ const ATTACHMENT_COLUMNS_MAPPING = {
   updatedAt: (timestamp) => {
     return timestamp instanceof Date ? timestamp.toISOString() : timestamp;
   },
-  noThumbnail: (no_thumbnail) => {
-    return no_thumbnail === '1';
-  },
   imageSizes: (image_sizes) => {
     return image_sizes ? JSON.stringify(image_sizes) : null;
   },
@@ -227,7 +223,6 @@ export const ATTACHMENT_FIELDS = {
   mime_type: 'mimeType',
   media_type: 'mediaType',
   file_extension: 'fileExtension',
-  no_thumbnail: 'noThumbnail',
   image_sizes: 'imageSizes',
   artist: 'artist',
   title: 'title',

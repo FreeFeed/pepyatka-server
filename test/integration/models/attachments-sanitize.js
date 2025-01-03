@@ -40,7 +40,7 @@ describe('Sanitize media metadata on create', () => {
       content: await fsPromises.readFile(photoWithGPSPath),
     });
 
-    const newTags = await exiftool.read(att.getPath());
+    const newTags = await exiftool.read(att.getLocalFilePath(''));
     expect(newTags, 'to not have keys', gpsTags);
     expect(att.sanitized, 'to be', SANITIZE_VERSION);
   });
@@ -55,7 +55,7 @@ describe('Sanitize media metadata on create', () => {
       content,
     });
 
-    const newContent = await fsPromises.readFile(att.getPath());
+    const newContent = await fsPromises.readFile(att.getLocalFilePath(''));
     const newHash = fileHash(newContent);
     expect(newHash, 'to equal', oldHash);
     expect(att.sanitized, 'to be', SANITIZE_VERSION);
@@ -75,7 +75,7 @@ describe('Sanitize media metadata on create', () => {
         content,
       });
 
-      const newContent = await fsPromises.readFile(att.getPath());
+      const newContent = await fsPromises.readFile(att.getLocalFilePath(''));
       const newHash = fileHash(newContent);
       expect(newHash, 'to equal', oldHash);
       expect(att.sanitized, 'to be', SANITIZE_NONE);
@@ -106,7 +106,7 @@ describe('sanitizeOriginal model method', () => {
       expect(prevSize, 'not to equal', att.fileSize);
       expect(att.sanitized, 'to be', SANITIZE_VERSION);
 
-      const newTags = await exiftool.read(att.getPath());
+      const newTags = await exiftool.read(att.getLocalFilePath(''));
       expect(newTags, 'to not have keys', gpsTags);
     });
 

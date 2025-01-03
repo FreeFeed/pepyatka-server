@@ -29,16 +29,6 @@ declare module 'config' {
       path: string;
       fileSizeLimit: number;
       maxCount: number;
-      imageSizes: Record<
-        string,
-        {
-          path: string;
-          bounds: {
-            width: number;
-            height: number;
-          };
-        }
-      >;
       sanitizeMetadata: {
         removeTags: RegExp[];
         ignoreTags: RegExp[];
