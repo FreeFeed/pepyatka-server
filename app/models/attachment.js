@@ -613,6 +613,30 @@ export function addModel(dbAdapter) {
       );
     }
 
+    /**
+     * Return the largest available preview variant of given media type
+     *
+     * @param {'image'|'video'} mediaType
+     * @returns {string|null}
+     */
+    maxSizedVariant(mediaType) {
+      if (!this.previews[mediaType]) {
+        return null;
+      }
+
+      let maxW = 0;
+      let maxVariant = null;
+
+      for (const [variant, { w }] of Object.entries(this.previews[mediaType])) {
+        if (w > maxW) {
+          maxW = w;
+          maxVariant = variant;
+        }
+      }
+
+      return maxVariant;
+    }
+
     async destroy() {
       await this.deleteFiles();
       await dbAdapter.deleteAttachment(this.id);

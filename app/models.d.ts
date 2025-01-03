@@ -206,6 +206,7 @@ export class Attachment {
   getFileUrl(variant: string, ext?: string | null): string;
   allFileVariants(includeOriginal?: boolean): { variant: string; ext: string }[];
   allRelFilePaths(includeOriginal?: boolean): string[];
+  maxSizedVariant(mediaType: 'image' | 'video'): string | null;
   downloadOriginal(): Promise<string>;
   sanitizeOriginal(): Promise<boolean>;
   destroy(destroyedBy?: User): Promise<void>;
