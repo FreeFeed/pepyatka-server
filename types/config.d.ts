@@ -194,6 +194,13 @@ declare module 'config' {
       headLikes: number;
       minOmittedLikes: number;
     };
+
+    corsProxy: {
+      timeout: ISO8601DurationString;
+      allowedOrigins: string[];
+      allowedURlPrefixes: string[];
+      allowLocalhostOrigins: boolean;
+    };
   };
 
   export type TranslationLimits = {
