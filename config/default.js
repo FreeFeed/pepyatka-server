@@ -511,4 +511,18 @@ config.foldingInPosts = {
   minOmittedLikes: 2, // Minimum number of omitted likes
 };
 
+config.corsProxy = {
+  // Timeout in ISO 8601 duration format
+  timeout: 'PT5S',
+  // The allowlist of request origins. 'none' is the special value that means
+  // 'no Origin header' (for the case when the client and the server are on the
+  // same host).
+  allowedOrigins: ['none'],
+  // Allow requests with any 'https?://localhost:*' origins (for local
+  // development).
+  allowLocalhostOrigins: true,
+  // The allowlist of proxied URL prefixes.
+  allowedURlPrefixes: [],
+};
+
 module.exports = config;

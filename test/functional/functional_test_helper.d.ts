@@ -1,3 +1,5 @@
+import { Context } from 'koa';
+
 import { Comment, Group, Post, User } from '../../app/models';
 import { UUID } from '../../app/support/types';
 
@@ -50,3 +52,12 @@ export function justCreateGroup(
 ): Promise<Group>;
 
 export function justLikeComment(commentObj: Comment, userCtx: UserCtx): Promise<void>;
+
+export class MockHTTPServer {
+  readonly port: number;
+  readonly origin: string;
+
+  constructor(handler: (ctx: Context) => void, opts?: { timeout?: number });
+  start(): Promise<void>;
+  stop(): Promise<void>;
+}
