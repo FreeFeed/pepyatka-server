@@ -17,11 +17,14 @@ export async function detectMediaType(
     try {
       const out = await spawnAsync('identify', [
         '-format',
-        '%m %w %h %[orientation]',
+        '%m %W %H %[orientation] %n|',
         localFilePath,
       ]);
 
-      const parts = out.stdout.split(' ');
+      // Select only the first values sequence (there could be more for animated images)
+      const pipePos = out.stdout.indexOf('|');
+      const parts = out.stdout.slice(0, pipePos).split(' ');
+
       const format = parts[0].toLowerCase();
 
       let width = parseInt(parts[1], 10);
@@ -32,8 +35,10 @@ export async function detectMediaType(
         [width, height] = [height, width];
       }
 
-      // Animated images? Only GIF is supported for now
-      if (format === 'gif') {
+      const nFrames = parseInt(parts[4], 10);
+
+      // Animated image? Only GIF is supported for now
+      if (format === 'gif' && nFrames > 1) {
         const data = await detectAnimatedImage(localFilePath);
 
         if (data) {

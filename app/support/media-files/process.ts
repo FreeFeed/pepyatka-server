@@ -114,7 +114,7 @@ async function processImage(
       }
 
       await spawnAsync('convert', [
-        localFilePath,
+        `${localFilePath}[0]`, // Adding [0] for the case of animated or multi-page images
         '-auto-orient',
         '-resize',
         `${width}!x${height}!`,
