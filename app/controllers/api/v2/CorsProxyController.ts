@@ -30,7 +30,7 @@ export async function proxy(ctx: Context) {
     // Origin header is present, check it validity
     !(
       allowedOrigins.includes(origin) ||
-      (allowLocalhostOrigins && /^https?:\/localhost(:\d+)?$/.test(origin))
+      (allowLocalhostOrigins && /^https?:\/\/localhost(:\d+)?$/.test(origin))
     )
   ) {
     throw new ForbiddenException('Origin not allowed');

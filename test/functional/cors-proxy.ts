@@ -28,7 +28,7 @@ describe('CORS proxy', () => {
 
   withModifiedConfig(() => ({
     corsProxy: {
-      allowedOrigins: ['none', 'http://localhost:3000'],
+      allowedOrigins: ['none', 'http://goodorigin.net'],
       allowedURlPrefixes: [`${server.origin}/example`],
     },
   }));
@@ -73,7 +73,18 @@ describe('CORS proxy', () => {
       'GET',
       `/v2/cors-proxy?url=${encodeURIComponent(url)}`,
       null,
-      { Origin: 'http://localhost:3000' },
+      { Origin: 'http://goodorigin.net' },
+    );
+    expect(resp, 'to satisfy', { __httpCode: 200, textResponse: 'Example text' });
+  });
+
+  it(`should call with allowed url and localhost origin`, async () => {
+    const url = `${server.origin}/example.txt`;
+    const resp = await performJSONRequest(
+      'GET',
+      `/v2/cors-proxy?url=${encodeURIComponent(url)}`,
+      null,
+      { Origin: 'http://localhost:8080' },
     );
     expect(resp, 'to satisfy', { __httpCode: 200, textResponse: 'Example text' });
   });
