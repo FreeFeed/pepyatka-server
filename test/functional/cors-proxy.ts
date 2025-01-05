@@ -29,7 +29,7 @@ describe('CORS proxy', () => {
   withModifiedConfig(() => ({
     corsProxy: {
       allowedOrigins: ['none', 'http://goodorigin.net'],
-      allowedURlPrefixes: [`${server.origin}/example`],
+      allowedUrlPrefixes: [`${server.origin}/example`],
     },
   }));
 

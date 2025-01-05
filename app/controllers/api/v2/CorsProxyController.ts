@@ -13,7 +13,7 @@ export async function proxy(ctx: Context) {
   const {
     timeout: timeoutString,
     allowedOrigins,
-    allowedURlPrefixes,
+    allowedUrlPrefixes,
     allowLocalhostOrigins,
   } = currentConfig().corsProxy;
 
@@ -48,7 +48,7 @@ export async function proxy(ctx: Context) {
   }
 
   // Check if the URL has allowed prefix
-  if (!allowedURlPrefixes.some((prefix) => url.startsWith(prefix))) {
+  if (!allowedUrlPrefixes.some((prefix) => url.startsWith(prefix))) {
     throw new ValidationException('URL not allowed');
   }
 

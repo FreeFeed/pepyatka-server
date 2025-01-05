@@ -522,7 +522,7 @@ config.corsProxy = {
   // development).
   allowLocalhostOrigins: true,
   // The allowlist of proxied URL prefixes.
-  allowedURlPrefixes: [],
+  allowedUrlPrefixes: [],
 };
 
 module.exports = config;

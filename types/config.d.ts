@@ -198,7 +198,7 @@ declare module 'config' {
     corsProxy: {
       timeout: ISO8601DurationString;
       allowedOrigins: string[];
-      allowedURlPrefixes: string[];
+      allowedUrlPrefixes: string[];
       allowLocalhostOrigins: boolean;
     };
   };
