@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - Not released
+### Added
+- New API method `GET /v2/cors-proxy?url=...`. This method acts as a simple
+  proxy for web clients that need to make requests to other origins
+  (specifically, to oEmbed endpoints of media providers). The proxy is
+  deliberately limited: the valid request origins and URL prefixes are defined
+  in the server config (see the _corsProxy_ config entry).
+
 ## [2.22.4] - 2024-12-04
 ### Changed
 - The `GET /v2/users/sparseMatches?qs=...`  API endpoint now returns private

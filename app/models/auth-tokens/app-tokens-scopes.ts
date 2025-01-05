@@ -52,6 +52,8 @@ export const alwaysDisallowedRoutes = [
   'POST /vN/users',
   // Email verification
   'POST /vN/users/verifyEmail',
+  // CORS proxy
+  'GET /vN/cors-proxy',
 ];
 
 export const appTokensScopes = [

@@ -14,9 +14,13 @@ import { currentConfig, setExplicitConfig } from '../../app/support/app-async-co
  * integration or unit tests. In all test in the given 'describe' block, the
  * currentConfig() function will return the patched config.
  */
-export function withModifiedConfig(patch: DeepPartial<Config>) {
+export function withModifiedConfig(patch: DeepPartial<Config> | (() => DeepPartial<Config>)) {
   let rollback: () => void = noop;
   before(() => {
+    if (typeof patch === 'function') {
+      patch = patch();
+    }
+
     const modifiedConfig = merge({}, currentConfig(), patch);
     rollback = setExplicitConfig(modifiedConfig);
   });

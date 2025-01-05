@@ -28,6 +28,7 @@ import InvitationsRoute from './routes/api/v2/InvitationsRoute';
 import AppTokensRoute from './routes/api/v2/AppTokens';
 import ServerInfoRoute from './routes/api/v2/ServerInfo';
 import ExtAuthRoute from './routes/api/v2/ExtAuth';
+import CorsProxyRoute from './routes/api/v2/CorsProxyRoute';
 import AdminCommonRoute from './routes/api/admin/CommonRoute';
 import AdminAdminRoute from './routes/api/admin/AdminRoute';
 import AdminModeratorRoute from './routes/api/admin/ModeratorRoute';
@@ -92,6 +93,7 @@ export function createRouter() {
   ServerInfoRoute(publicRouter);
   ExtAuthRoute(publicRouter);
   AttachmentsRouteV2(publicRouter);
+  CorsProxyRoute(publicRouter);
 
   const router = new Router();
   router.use('/v([1-9]\\d*)', publicRouter.routes(), publicRouter.allowedMethods());
