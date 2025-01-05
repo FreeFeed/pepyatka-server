@@ -56,7 +56,10 @@ export async function proxy(ctx: Context) {
   const timeoutMs = timeoutDuration.isValid ? timeoutDuration.toMillis() : fallbackTimeoutMs;
 
   // Perform the request with timeout
-  const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  const response = await fetch(url, {
+    headers: { 'Accept-Encoding': 'identity' },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
 
   // Copying to the client:
   // 1. The response status code
