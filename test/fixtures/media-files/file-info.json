@@ -83,6 +83,7 @@
         "compatible_brands": "isomiso2avc1mp41",
         "encoder": "Lavf61.7.100"
       },
+      "h264info": { "profile": "High", "level": 31, "pix_fmt": "yuv420p" },
       "extension": "mp4"
     }
   },

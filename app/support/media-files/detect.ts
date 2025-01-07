@@ -2,7 +2,7 @@ import { open } from 'fs/promises';
 
 import { spawnAsync } from '../spawn-async';
 
-import { FfprobeResult, MediaInfo, MediaInfoVideo } from './types';
+import { AvcStream, FfprobeResult, H264Info, MediaInfo, MediaInfoVideo } from './types';
 import { addFileExtension } from './file-ext';
 
 export async function detectMediaType(
@@ -81,6 +81,18 @@ export async function detectMediaType(
         }
       }
 
+      // Extract additional info if video codec is h264
+      let h264info: H264Info | undefined = undefined;
+
+      if (videoStream.codec_name === 'h264' && videoStream.is_avc === 'true') {
+        const s = videoStream as AvcStream;
+        h264info = {
+          profile: s.profile,
+          level: s.level,
+          pix_fmt: s.pix_fmt,
+        };
+      }
+
       return addFileExtension(
         {
           type: 'video',
@@ -90,6 +102,7 @@ export async function detectMediaType(
           duration: parseFloat(format.duration),
           width,
           height,
+          h264info,
           tags: format.tags,
         },
         origFileName,

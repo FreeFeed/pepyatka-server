@@ -20,12 +20,19 @@ export type MediaInfoImage = {
 } & MediaInfoVisual &
   MediaInfoCommon;
 
+export type H264Info = {
+  profile: string;
+  level: number;
+  pix_fmt: string;
+};
+
 export type MediaInfoVideo = {
   type: 'video';
   format: string;
   vCodec: string;
   aCodec?: string;
   isAnimatedImage?: true;
+  h264info?: H264Info;
 } & MediaInfoVisual &
   MediaInfoPlayable &
   MediaInfoCommon;
@@ -80,11 +87,19 @@ export type Stream = { codec_name: string } & (
       height: number;
       nb_frames: string;
       side_data_list?: Record<string, string>[];
+      is_avc?: 'true' | 'false';
     }
   | {
       codec_type: 'audio';
     }
 );
+
+export type AvcStream = Stream & {
+  is_avc: 'true';
+  profile: string;
+  level: number;
+  pix_fmt: string;
+};
 
 export type FfprobeResult = {
   format: { format_name: string; duration: string; tags?: Record<string, string> };
