@@ -209,10 +209,8 @@ declare module 'config' {
         height: number;
       };
     };
-    imagePreviews: {
-      format: string;
-      extension: string;
-      quality: number;
+    videoPreviewShortSides: {
+      [k: string]: number;
     };
     nonVisualPreviewTypes: string[];
   };

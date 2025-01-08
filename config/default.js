@@ -179,10 +179,11 @@ config.attachments = {
       thumbnails: { width: 525, height: 175 },
       thumbnails2: { width: 1050, height: 350 },
     },
-    imagePreviews: {
-      format: 'webp',
-      extension: 'webp',
-      quality: 75,
+    videoPreviewShortSides: {
+      // Sizes in pixels of the shortest side of the preview. Must be a multiple of 2!
+      v1: 480,
+      v2: 720,
+      v3: 1080,
     },
     nonVisualPreviewTypes: [
       'a1', // Audio preview

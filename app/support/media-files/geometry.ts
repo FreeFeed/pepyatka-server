@@ -61,6 +61,69 @@ export function getImagePreviewSizes(
   return result;
 }
 
+export function getVideoPreviewSizes(
+  info: Box,
+  { videoPreviewShortSides } = config.attachments.previews,
+): ({ variant: string } & Box)[] {
+  const previews: { [variant: string]: Box } = {};
+
+  const presets = [...Object.entries(videoPreviewShortSides)];
+  presets.sort((a, b) => b[1] - a[1]); // Sort by descending size
+
+  const shortSide = Math.min(info.width, info.height);
+  const longSide = Math.max(info.width, info.height);
+
+  for (const [variant, size] of presets) {
+    if (shortSide >= size) {
+      // The size must be a multiple of 2
+      const newLongSide = Math.round((size * longSide) / shortSide / 2) * 2;
+      previews[variant] = {
+        width: shortSide === info.width ? size : newLongSide,
+        height: shortSide === info.height ? size : newLongSide,
+      };
+    }
+  }
+
+  // If the video is larger than any of preset sizes
+  if (shortSide > presets[0][1]) {
+    const [[variant, size]] = presets;
+
+    // If video is slightly bigger than the largest preset, use the video size
+    if (shortSide < size * 1.25) {
+      previews[variant] = {
+        width: downToEven(info.width),
+        height: downToEven(info.height),
+      };
+    }
+  } else {
+    // Find the preset with the closest size, and use image size for it
+    let dist = Infinity;
+    let matched = null;
+
+    for (const [variant, size] of presets) {
+      const d = Math.abs(Math.log(shortSide / size));
+
+      if (d < dist) {
+        dist = d;
+        matched = variant;
+      }
+    }
+
+    if (matched) {
+      previews[matched] = {
+        width: downToEven(info.width),
+        height: downToEven(info.height),
+      };
+    }
+  }
+
+  const result = [...Object.entries(previews)].map(([variant, size]) => ({ variant, ...size }));
+  // Sort by descending size
+  result.sort((a, b) => b.width - a.width);
+
+  return result;
+}
+
 function fitIntoArea({ width, height }: Box, area: number): Box {
   if (width * height > area) {
     const ratio = Math.sqrt(area / (width * height));
@@ -80,4 +143,8 @@ function fitIntoBox({ width, height }: Box, { width: boxWidth, height: boxHeight
   }
 
   return { width: Math.round(width / hRatio), height: boxHeight };
+}
+
+function downToEven(x: number): number {
+  return x % 2 === 0 ? x : x - 1;
 }
