@@ -57,13 +57,6 @@ jobs:
       - name: create directories for attachments
         run: |
           mkdir -p /tmp/pepyatka-media/attachments
-          mkdir /tmp/pepyatka-media/attachments/thumbnails
-          mkdir /tmp/pepyatka-media/attachments/thumbnails2
-          mkdir /tmp/pepyatka-media/attachments/p1
-          mkdir /tmp/pepyatka-media/attachments/p2
-          mkdir /tmp/pepyatka-media/attachments/p3
-          mkdir /tmp/pepyatka-media/attachments/p4
-          mkdir /tmp/pepyatka-media/attachments/a1
 
       - name: Install dependencies
         run: yarn

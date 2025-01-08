@@ -33,16 +33,6 @@ describe('Attachments', () => {
 
     // Create directories for attachments
     await mkdirp(attConf.storage.rootDir + attConf.path);
-
-    const variants = [
-      ...Object.keys(attConf.previews.imagePreviewAreas),
-      ...Object.keys(attConf.previews.legacyImagePreviewSizes),
-      ...attConf.previews.nonVisualPreviewTypes,
-    ];
-
-    await Promise.all(
-      variants.map((variant) => mkdirp(attConf.storage.rootDir + attConf.path + variant)),
-    );
   });
 
   beforeEach(() => fakeS3Storage.clear());

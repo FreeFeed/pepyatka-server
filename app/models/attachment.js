@@ -140,14 +140,12 @@ export function addModel(dbAdapter) {
       // Upload or move files
       await Promise.all(
         Object.entries(files).map(async ([variant, { path, ext }]) => {
-          const fPath = object.getRelFilePath(variant, ext);
-
           if (storageConfig.type === 's3') {
             const mimeType = mime.lookup(ext) || 'application/octet-stream';
-            await object.uploadToS3(path, fPath, mimeType);
+            await object.uploadToS3(path, object.getRelFilePath(variant, ext), mimeType);
             await fs.unlink(path);
           } else {
-            await mvAsync(path, storageConfig.rootDir + fPath, {});
+            await mvAsync(path, object.getLocalFilePath(variant, ext), { mkdirp: true });
           }
         }),
       );
@@ -407,7 +405,7 @@ export function addModel(dbAdapter) {
             this.mimeType,
           );
         } else {
-          await mvAsync(localFile, this.getLocalFilePath('', this.fileExtension), {});
+          await mvAsync(localFile, this.getLocalFilePath('', this.fileExtension), { mkdirp: true });
         }
 
         return true;
