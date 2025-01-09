@@ -3,26 +3,28 @@ import { spawn, type SpawnOptionsWithoutStdio } from 'child_process';
 
 export type SpawnAsyncOptions = SpawnOptionsWithoutStdio & { binary?: true };
 
+export type SpawnAsyncArgs = (string | string[])[];
+
 /**
  * Spawns a child process and returns a promise resolving with its output
  */
 export function spawnAsync(
   command: string,
-  args: readonly string[],
+  args: SpawnAsyncArgs,
   options: SpawnOptionsWithoutStdio & { binary: true },
 ): Promise<{ stdout: Buffer; stderr: string }>;
 export function spawnAsync(
   command: string,
-  args: readonly string[],
+  args: SpawnAsyncArgs,
   options?: SpawnOptionsWithoutStdio,
 ): Promise<{ stdout: string; stderr: string }>;
 export function spawnAsync(
   command: string,
-  args: readonly string[] = [],
+  args: SpawnAsyncArgs,
   options: SpawnOptionsWithoutStdio & { binary?: true } = {},
 ): Promise<{ stdout: string | Buffer; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, options);
+    const child = spawn(command, args.flat(), options);
     const { binary = false } = options;
 
     const stdoutParts: Uint8Array[] = [];

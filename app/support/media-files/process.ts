@@ -3,7 +3,7 @@ import { stat } from 'fs/promises';
 import { lookup as mimeLookup } from 'mime-types';
 import { exiftool } from 'exiftool-vendored';
 
-import { spawnAsync } from '../spawn-async';
+import { spawnAsync, SpawnAsyncArgs } from '../spawn-async';
 
 import { detectMediaType } from './detect';
 import {
@@ -116,13 +116,10 @@ async function processImage(
       await spawnAsync('convert', [
         `${localFilePath}[0]`, // Adding [0] for the case of animated or multi-page images
         '-auto-orient',
-        '-resize',
-        `${width}!x${height}!`,
-        '-profile',
-        `${__dirname}/../../../lib/assets/sRGB.icm`,
+        ['-resize', `${width}!x${height}!`],
+        ['-profile', `${__dirname}/../../../lib/assets/sRGB.icm`],
         '-strip',
-        '-quality',
-        '75',
+        ['-quality', '75'],
         `webp:${tmpFileVariant(localFilePath, variant, 'webp')}`,
       ]);
 
@@ -159,23 +156,16 @@ async function processAudio(
 
   await spawnAsync('ffmpeg', [
     '-hide_banner',
-    '-loglevel',
-    'error',
-    '-i',
-    localFilePath,
+    ['-loglevel', 'error'],
+    ['-i', localFilePath],
     '-y', // Overwrite existing file
-    '-map',
-    '0:a:0', // Use only the first audio stream
-    '-c:a',
-    'aac', // Convert to AAC
-    '-b:a',
-    '192k', // Set bitrate to 192k
+    ['-map', '0:a:0'], // Use only the first audio stream
+    ['-c:a', 'aac'], // Convert to AAC
+    ['-b:a', '192k'], // Set bitrate to 192k
     '-sn', // Skip subtitles (if any)
     '-dn', // Skip other data (if any)
-    '-map_metadata',
-    '-1', // Remove all metadata
-    '-f',
-    'mp4', // Output in m4a/mov container
+    ['-map_metadata', '-1'], // Remove all metadata
+    ['-f', 'mp4'], // Output in m4a/mov container
     outFile,
   ]);
 

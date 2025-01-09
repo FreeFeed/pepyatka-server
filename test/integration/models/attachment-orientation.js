@@ -78,13 +78,10 @@ async function getOrientation(filename) {
  */
 async function createTestImage(filename, orientation) {
   await spawnAsync('convert', [
-    '-size',
-    '200x300',
+    ['-size', '200x300'],
     'xc:#000000',
-    '-fill',
-    '#ffffff',
-    '-draw',
-    'rectangle 0,0 100,100',
+    ['-fill', '#ffffff'],
+    ['-draw', 'rectangle 0,0 100,100'],
     `jpeg:${filename}`,
   ]);
 

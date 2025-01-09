@@ -16,8 +16,7 @@ export async function detectMediaType(
     // Identify using ImageMagick
     try {
       const out = await spawnAsync('identify', [
-        '-format',
-        '%m %W %H %[orientation] %n|',
+        ['-format', '%m %W %H %[orientation] %n|'],
         localFilePath,
       ]);
 
@@ -157,14 +156,11 @@ async function detectAnimatedImage(
 async function runFfprobe(file: string): Promise<FfprobeResult> {
   const out = await spawnAsync('ffprobe', [
     '-hide_banner',
-    '-loglevel',
-    'warning',
+    ['-loglevel', 'warning'],
     '-show_format',
     '-show_streams',
-    '-print_format',
-    'json',
-    '-i',
-    file,
+    ['-print_format', 'json'],
+    ['-i', file],
   ]);
   return JSON.parse(out.stdout) as FfprobeResult;
 }
