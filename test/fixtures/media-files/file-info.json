@@ -76,12 +76,13 @@
       "aCodec": "aac",
       "width": 1280,
       "height": 720,
-      "duration": 40.04,
+      "duration": 5.005,
       "tags": {
+        "title": "Kreuz-Polka",
         "major_brand": "isom",
         "minor_version": "512",
         "compatible_brands": "isomiso2avc1mp41",
-        "encoder": "Lavf61.7.100"
+        "encoder": "Lavf58.29.100"
       },
       "h264info": { "profile": "High", "level": 31, "pix_fmt": "yuv420p" },
       "extension": "mp4"
@@ -96,7 +97,7 @@
       "aCodec": "vorbis",
       "width": 1280,
       "height": 720,
-      "duration": 40.04,
+      "duration": 4.993,
       "extension": "ogv"
     }
   },
@@ -109,8 +110,8 @@
       "aCodec": "wmav2",
       "width": 1280,
       "height": 720,
-      "duration": 40.084,
-      "tags": { "encoder": "Lavf61.7.100" },
+      "duration": 5.237,
+      "tags": { "encoder": "Lavf58.29.100" },
       "extension": "wmv"
       
     }
