@@ -168,6 +168,34 @@ describe('Attachments', () => {
     });
   });
 
+  it(`should create attachment from animated gif`, async () => {
+    const filePath = path.join(__dirname, '../fixtures/test-image-animated.gif');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'image/gif'));
+    const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'test-image-animated.gif',
+        mediaType: 'image',
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'gif'),
+        thumbnailUrl: attObj.getFileUrl('thumbnails', 'webp'),
+        imageSizes: {
+          o: { w: 774, h: 392, url: attObj.getFileUrl('', 'gif') },
+          t: { w: 346, h: 175, url: attObj.getFileUrl('thumbnails', 'webp') },
+          t2: { w: 691, h: 350, url: attObj.getFileUrl('thumbnails2', 'webp') },
+        },
+        createdBy: luna.user.id,
+        postId: null,
+      },
+      users: [{ id: luna.user.id }],
+    });
+  });
+
   it(`should create attachment from any binary form field`, async () => {
     const data = new FormData();
     data.append('name', 'john');

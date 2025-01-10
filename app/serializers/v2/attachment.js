@@ -52,5 +52,28 @@ function serializeAttachmentV3(att) {
     result.title = att.meta['dc:title'];
   }
 
+  if (att.mediaType === 'video') {
+    if (att.meta.animatedImage) {
+      // Show it as 'image'
+      result.mediaType = 'image';
+
+      for (const [variant, { w, h, ext }] of Object.entries(att.previews.image)) {
+        if (variant === 'thumbnails') {
+          result.imageSizes['t'] = { w, h, url: att.getFileUrl(variant, ext) };
+          result.thumbnailUrl = att.getFileUrl(variant, ext);
+        }
+
+        if (variant === 'thumbnails2') {
+          result.imageSizes['t2'] = { w, h, url: att.getFileUrl(variant, ext) };
+        }
+      }
+
+      result.imageSizes['o'] = { w: att.width, h: att.height, url: result.url };
+    } else {
+      // Show it as 'general'
+      result.mediaType = 'general';
+    }
+  }
+
   return result;
 }
