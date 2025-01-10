@@ -405,6 +405,78 @@ describe('Attachments', () => {
       filesMustExistOnS3(attachment, false);
     });
   });
+
+  describe('Video attachments', () => {
+    it('should create an h264 video attachment', async () => {
+      const att = await createAndCheckAttachment(testFiles.videoMp4Avc, post, user);
+      expect(att.mimeType, 'to equal', testFiles.videoMp4Avc.type);
+      expect(att.previews, 'to equal', {
+        video: {
+          '': { h: 720, w: 1280, ext: 'mp4' },
+          v1: { h: 480, w: 854, ext: 'mp4' },
+        },
+        image: {
+          p1: { h: 260, w: 462, ext: 'webp' },
+          p2: { h: 474, w: 843, ext: 'webp' },
+          p3: { h: 720, w: 1280, ext: 'webp' },
+          thumbnails: { h: 175, w: 311, ext: 'webp' },
+          thumbnails2: { h: 350, w: 622, ext: 'webp' },
+        },
+      });
+    });
+
+    it('should create an Ogv video attachment', async () => {
+      const att = await createAndCheckAttachment(testFiles.videoOgv, post, user);
+      expect(att.mimeType, 'to equal', testFiles.videoOgv.type);
+      expect(att.previews, 'to equal', {
+        video: {
+          '': { h: 720, w: 1280, ext: 'mp4' },
+          v1: { h: 480, w: 854, ext: 'mp4' },
+        },
+        image: {
+          p1: { h: 260, w: 462, ext: 'webp' },
+          p2: { h: 474, w: 843, ext: 'webp' },
+          p3: { h: 720, w: 1280, ext: 'webp' },
+          thumbnails: { h: 175, w: 311, ext: 'webp' },
+          thumbnails2: { h: 350, w: 622, ext: 'webp' },
+        },
+      });
+    });
+
+    it('should create a small h264 video attachment', async () => {
+      const att = await createAndCheckAttachment(testFiles.mov, post, user);
+      expect(att.mimeType, 'to equal', testFiles.mov.type);
+      expect(att.previews, 'to equal', {
+        video: {
+          '': { h: 710, w: 1572, ext: 'mp4' },
+          v1: { h: 480, w: 1062, ext: 'mp4' },
+        },
+        image: {
+          p1: { h: 233, w: 515, ext: 'webp' },
+          p2: { h: 425, w: 941, ext: 'webp' },
+          p3: { h: 710, w: 1572, ext: 'webp' },
+          thumbnails: { h: 175, w: 387, ext: 'webp' },
+          thumbnails2: { h: 350, w: 775, ext: 'webp' },
+        },
+      });
+    });
+
+    it('should create a video attachment from animated gif', async () => {
+      const att = await createAndCheckAttachment(testFiles.animated, post, user);
+      expect(att.mimeType, 'to equal', testFiles.animated.type);
+      expect(att.previews, 'to equal', {
+        video: {
+          v1: { h: 392, w: 774, ext: 'mp4' },
+        },
+        image: {
+          p1: { h: 247, w: 487, ext: 'webp' },
+          p2: { h: 392, w: 774, ext: 'webp' },
+          thumbnails: { h: 175, w: 346, ext: 'webp' },
+          thumbnails2: { h: 350, w: 691, ext: 'webp' },
+        },
+      });
+    });
+  });
 });
 
 async function uploadFile(fileObject) {

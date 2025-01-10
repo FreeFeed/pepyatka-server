@@ -82,8 +82,17 @@ export const testFiles = {
     type: 'image/webp',
   },
   mov: {
-    size: 589371,
     name: 'test-quicktime-video.mov',
     type: 'video/mp4',
+    extension: 'mp4',
+  },
+  videoMp4Avc: {
+    name: 'media-files/polyphon.mp4',
+    type: 'video/mp4',
+  },
+  videoOgv: {
+    name: 'media-files/polyphon.ogv',
+    type: 'video/mp4',
+    extension: 'mp4',
   },
 };

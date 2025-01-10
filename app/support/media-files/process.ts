@@ -1,4 +1,4 @@
-import { stat } from 'fs/promises';
+import { stat, unlink } from 'fs/promises';
 
 import { lookup as mimeLookup } from 'mime-types';
 import { exiftool } from 'exiftool-vendored';
@@ -7,14 +7,16 @@ import { spawnAsync, SpawnAsyncArgs } from '../spawn-async';
 
 import { detectMediaType } from './detect';
 import {
+  Box,
   FilesToUpload,
   MediaInfoAudio,
   MediaInfoImage,
+  MediaInfoVideo,
   MediaProcessResult,
   NonVisualPreviews,
   VisualPreviews,
 } from './types';
-import { getImagePreviewSizes } from './geometry';
+import { getImagePreviewSizes, getVideoPreviewSizes } from './geometry';
 
 /**
  * Process media file:
@@ -34,8 +36,18 @@ export async function processMediaFile(
     fileSize: fileStat.size,
     fileName: origFileName,
     mimeType: mimeLookup(info.extension) || 'application/octet-stream',
-    meta: {},
+    meta: {} as MediaProcessResult['meta'],
   };
+
+  if (info.type === 'audio' || info.type === 'video') {
+    if (info.tags?.title) {
+      commonResult.meta!['dc:title'] = info.tags.title;
+    }
+
+    if (info.tags?.artist) {
+      commonResult.meta!['dc:creator'] = info.tags.artist;
+    }
+  }
 
   if (info.type === 'image') {
     const [imagePreviews, files] = await processImage(info, localFilePath);
@@ -44,23 +56,44 @@ export async function processMediaFile(
 
   if (info.type === 'audio') {
     const [audioPreviews, files] = await processAudio(info, localFilePath);
-    const meta: MediaProcessResult['meta'] = {};
-
-    if (info.tags?.title) {
-      meta['dc:title'] = info.tags.title;
-    }
-
-    if (info.tags?.artist) {
-      meta['dc:creator'] = info.tags.artist;
-    }
 
     return {
       mediaType: 'audio',
       ...commonResult,
       duration: info.duration,
       previews: { audio: audioPreviews },
-      meta,
       files,
+    };
+  }
+
+  if (info.type === 'video') {
+    const [previews, files] = await processVideo(info, localFilePath);
+    const meta: MediaProcessResult['meta'] = {};
+
+    if (info.isAnimatedImage) {
+      meta.animatedImage = true;
+    }
+
+    let { fileExtension, mimeType } = commonResult;
+
+    // For video files we may not keep the original, so get extension from the
+    // '' file
+    for (const [variant, { ext }] of Object.entries(files)) {
+      if (variant === '') {
+        fileExtension = ext;
+        mimeType = mimeLookup(ext) || 'application/octet-stream';
+      }
+    }
+
+    return {
+      mediaType: 'video',
+      ...commonResult,
+      fileExtension,
+      mimeType,
+      duration: info.duration,
+      previews,
+      files,
+      meta,
     };
   }
 
@@ -74,12 +107,14 @@ export async function processMediaFile(
 async function processImage(
   info: MediaInfoImage,
   localFilePath: string,
+  isVideoStill = false,
 ): Promise<[VisualPreviews, FilesToUpload]> {
   const previewSizes = getImagePreviewSizes(info);
 
   // Now we should create all the previews
 
   const [maxPreviewSize] = previewSizes;
+  let useOriginal = false;
 
   if (maxPreviewSize.width === info.width && maxPreviewSize.height === info.height) {
     // We can probably use original as a largest preview
@@ -92,24 +127,28 @@ async function processImage(
       (['png', 'gif'].includes(info.format) && fileSize < 512 * 1024)
     ) {
       if (info.format === 'jpeg') {
-        const ok = await canUseJpegOriginal(localFilePath);
-
-        if (ok) {
-          maxPreviewSize.variant = '';
-        }
+        useOriginal = await canUseJpegOriginal(localFilePath);
       } else {
-        maxPreviewSize.variant = '';
+        useOriginal = true;
       }
     }
   }
 
   const previews: VisualPreviews = {};
-  const filesToUpload: FilesToUpload = { '': { path: localFilePath, ext: info.extension } };
+  const filesToUpload: FilesToUpload = {};
+
+  if (!isVideoStill) {
+    filesToUpload[''] = { path: localFilePath, ext: info.extension };
+  }
 
   await Promise.all(
     previewSizes.map(async ({ variant, width, height }) => {
-      if (variant === '') {
+      if (variant === maxPreviewSize.variant && useOriginal) {
         previews[variant] = { w: width, h: height, ext: info.extension };
+        filesToUpload[variant] = {
+          path: localFilePath,
+          ext: info.extension,
+        };
         return;
       }
 
@@ -130,6 +169,13 @@ async function processImage(
       };
     }),
   );
+
+  if (useOriginal && !isVideoStill) {
+    previews[''] = previews[maxPreviewSize.variant];
+    filesToUpload[''] = filesToUpload[maxPreviewSize.variant];
+    delete previews[maxPreviewSize.variant];
+    delete filesToUpload[maxPreviewSize.variant];
+  }
 
   return [previews, filesToUpload];
 }
@@ -175,8 +221,164 @@ async function processAudio(
   return [previews, filesToUpload];
 }
 
+async function processVideo(
+  info: MediaInfoVideo,
+  localFilePath: string,
+): Promise<[{ video: VisualPreviews; image: VisualPreviews }, FilesToUpload]> {
+  const previewSizes = getVideoPreviewSizes(info);
+
+  const keepOriginalFile = info.isAnimatedImage === true;
+
+  const [maxPreviewSize] = previewSizes;
+  const maxVariant = maxPreviewSize.variant;
+
+  const stillFrameOffset = info.isAnimatedImage ? 0 : info.duration / 2;
+  const canUseOriginalVideo = canUseOriginalVideoStream(info, maxPreviewSize);
+
+  const videoPreviews: VisualPreviews = {};
+  const videoFiles: FilesToUpload = {};
+
+  // Ffmpeg CLI arguments
+  const commands: SpawnAsyncArgs = [];
+
+  const audioCommands = [];
+
+  if (!info.aCodec) {
+    // No audio stream
+    audioCommands.push('-an');
+  } else if (info.aCodec === 'aac') {
+    // We can use audio as is
+    audioCommands.push(['-map', '0:a:0'], ['-c:a', 'copy']);
+  } else {
+    // We need to convert audio to AAC
+    audioCommands.push(['-map', '0:a:0'], ['-c:a', 'aac'], ['-b:a', '160k']);
+  }
+
+  // Components of 'filter_complex' graph
+  const filters: string[] = [];
+
+  // First, we need to resize the original video to maximum preview size
+  if (maxPreviewSize.width === info.width && maxPreviewSize.height === info.height) {
+    // We can use original video sizes
+    filters.push(`[0:v:0]copy[max]`);
+  } else if (maxPreviewSize.width + 1 === info.width || maxPreviewSize.height + 1 === info.height) {
+    // Special case: the original has odd dimensions, so we just need to crop it to maxPreviewSize
+    filters.push(`[0:v:0]crop=${maxPreviewSize.width}:${maxPreviewSize.height}:0:0[max]`);
+  } else {
+    filters.push(
+      `[0:v:0]zscale=w=${maxPreviewSize.width}:h=${maxPreviewSize.height}:filter=lanczos[max]`,
+    );
+  }
+
+  // Next, we need to split video stream for the further processing. We should
+  // have one 'still' stream for the still frame and some streams for each of
+  // the preview sizes. If we can use original video, then we don't need the
+  // split output for the maximum preview size.
+  const splitVariants = [
+    'still',
+    ...previewSizes.map((p) => p.variant).filter((v) => !canUseOriginalVideo || v !== maxVariant),
+  ];
+  filters.push(
+    `[max]split=${splitVariants.length}${splitVariants.map((v) => `[${v}in]`).join('')}`,
+  );
+
+  // Command for the still frame
+  const stillFile = tmpFileVariant(localFilePath, 'still', 'webp');
+  commands.push(
+    ['-map', `[stillin]`],
+    ['-ss', stillFrameOffset.toString()],
+    ['-frames:v', '1'],
+    stillFile,
+  );
+
+  for (const { variant, width, height } of previewSizes) {
+    if (variant === maxVariant) {
+      if (!canUseOriginalVideo) {
+        filters.push(`[${variant}in]copy[${variant}out]`);
+      }
+    } else {
+      filters.push(`[${variant}in]zscale=w=${width}:h=${height}:filter=lanczos[${variant}out]`);
+    }
+
+    const commonCommands = [
+      ...audioCommands,
+      ['-map_metadata', '-1'],
+      ['-map_chapters', '-1'],
+      ['-movflags', '+faststart'],
+    ];
+
+    const targetFile = tmpFileVariant(localFilePath, variant, 'mp4');
+
+    if (variant === maxVariant && canUseOriginalVideo) {
+      commands.push(
+        ['-map', '0:v:0'],
+        ['-c:v', 'copy'], // Just copy the original video stream
+        ...commonCommands,
+        targetFile,
+      );
+    } else {
+      commands.push(
+        ['-map', `[${variant}out]`],
+        ['-c:v', 'libx264'],
+        ['-preset', 'slow'],
+        ['-profile:v', 'high'],
+        ['-crf', '23'],
+        ['-pix_fmt', 'yuv420p'],
+        ...commonCommands,
+        targetFile,
+      );
+    }
+
+    videoFiles[variant] = {
+      path: targetFile,
+      ext: 'mp4',
+    };
+    videoPreviews[variant] = {
+      w: width,
+      h: height,
+      ext: 'mp4',
+    };
+  }
+
+  await spawnAsync('ffmpeg', [
+    '-hide_banner',
+    ['-loglevel', 'error'],
+    ['-i', localFilePath],
+    ['-filter_complex', filters.join(';')],
+    ...commands,
+  ]);
+
+  const [imagePreviews, imageFiles] = await processImage(
+    {
+      type: 'image',
+      format: 'webp',
+      extension: 'webp',
+      width: maxPreviewSize.width,
+      height: maxPreviewSize.height,
+    },
+    stillFile,
+    true,
+  );
+
+  if (!keepOriginalFile) {
+    await unlink(localFilePath);
+
+    videoPreviews[''] = videoPreviews[maxVariant];
+    videoFiles[''] = videoFiles[maxVariant];
+    delete videoPreviews[maxVariant];
+    delete videoFiles[maxVariant];
+  } else {
+    videoFiles[''] = { path: localFilePath, ext: info.extension };
+  }
+
+  return [
+    { video: videoPreviews, image: imagePreviews },
+    { ...videoFiles, ...imageFiles },
+  ];
+}
+
 function tmpFileVariant(filePath: string, variant: string, ext: string): string {
-  return `${filePath}.variant.${variant}.${ext}`;
+  return `${filePath}.variant.${variant ? `${variant}.` : ''}${ext}`;
 }
 
 /**
@@ -213,5 +415,16 @@ async function canUseJpegOriginal(localFilePath: string): Promise<boolean> {
     (typeof orientation !== 'number' || orientation === 1) &&
     // Have no preview rotation
     (typeof previewOrientation !== 'number' || previewOrientation === 1)
+  );
+}
+
+// Can we use the original video stream for the largest preview as is?
+function canUseOriginalVideoStream(info: MediaInfoVideo, maxPreviewSize: Box): boolean {
+  const safeH264Profiles = ['Baseline', 'Main', 'High', 'Constrained Baseline'];
+  return (
+    info.h264info?.pix_fmt === 'yuv420p' &&
+    safeH264Profiles.includes(info.h264info?.profile) &&
+    info.width === maxPreviewSize.width &&
+    info.height === maxPreviewSize.height
   );
 }
