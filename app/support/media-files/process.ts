@@ -37,9 +37,19 @@ export async function processMediaFile(
     fileName: origFileName,
     mimeType: mimeLookup(info.extension) || 'application/octet-stream',
     meta: {} as MediaProcessResult['meta'],
+    width: undefined as number | undefined,
+    height: undefined as number | undefined,
+    duration: undefined as number | undefined,
   };
 
+  if (info.type === 'image' || info.type === 'video') {
+    commonResult.width = info.width;
+    commonResult.height = info.height;
+  }
+
   if (info.type === 'audio' || info.type === 'video') {
+    commonResult.duration = info.duration;
+
     if (info.tags?.title) {
       commonResult.meta!['dc:title'] = info.tags.title;
     }

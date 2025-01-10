@@ -29,6 +29,10 @@ export function addModel(dbAdapter) {
       this.fileExtension = params.fileExtension; // jpg|png|gif etc, but empty for non-whitelisted types
       this.mediaType = params.mediaType; // image | audio | general
 
+      this.width = params.width;
+      this.height = params.height;
+      this.duration = params.duration;
+
       this._imageSizes = params.imageSizes; // pixel sizes of thumbnail(s) and original image, e.g. {t: {w: 200, h: 175}, o: {w: 600, h: 525}}
       this._previews = params.previews;
       this._meta = params.meta;

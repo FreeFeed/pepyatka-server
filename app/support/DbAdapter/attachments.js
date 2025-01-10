@@ -190,6 +190,9 @@ const ATTACHMENT_COLUMNS = {
   sanitized: 'sanitized',
   previews: 'previews',
   meta: 'meta',
+  width: 'width',
+  height: 'height',
+  duration: 'duration',
 };
 
 const ATTACHMENT_COLUMNS_MAPPING = {
@@ -235,6 +238,9 @@ export const ATTACHMENT_FIELDS = {
   sanitized: 'sanitized',
   previews: 'previews',
   meta: 'meta',
+  width: 'width',
+  height: 'height',
+  duration: 'duration',
 };
 
 const ATTACHMENT_FIELDS_MAPPING = {

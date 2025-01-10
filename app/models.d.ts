@@ -194,6 +194,10 @@ export class Attachment {
   id: UUID;
   fileSize: number;
   sanitized: number;
+  meta: { animatedImage?: true } & { [key: string]: string };
+  width: number | null;
+  height: number | null;
+  duration: number | null;
   constructor(params: AttachmentParams);
   static create(
     filePath: string,

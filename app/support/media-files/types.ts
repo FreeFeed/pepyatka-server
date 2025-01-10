@@ -60,6 +60,8 @@ export type MediaProcessResult = {
   fileExtension: string;
   mimeType: string;
 
+  width?: number;
+  height?: number;
   duration?: number;
   previews?: {
     image?: VisualPreviews;
