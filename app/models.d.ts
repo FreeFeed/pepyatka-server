@@ -6,6 +6,7 @@ import { GONE_NAMES } from './models/user';
 import { ISO8601DateTimeString, ISO8601DurationString, Nullable, UUID } from './support/types';
 import { SessionTokenV1Store } from './models/auth-tokens';
 import { List } from './support/open-lists';
+import { MediaMetaData, MediaPreviews } from './support/media-files/types';
 
 export const postgres: Knex;
 export const dbAdapter: DbAdapter;
@@ -194,7 +195,8 @@ export class Attachment {
   id: UUID;
   fileSize: number;
   sanitized: number;
-  meta: { animatedImage?: true } & { [key: `dc:${string}`]: string };
+  previews: MediaPreviews;
+  meta: MediaMetaData;
   width: number | null;
   height: number | null;
   duration: number | null;

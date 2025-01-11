@@ -50,6 +50,19 @@ export type MediaInfoGeneral = {
 
 export type MediaInfo = MediaInfoImage | MediaInfoVideo | MediaInfoAudio | MediaInfoGeneral;
 
+export type MediaMetaData = {
+  animatedImage?: true;
+  silent?: true;
+} & {
+  [key: `dc:${string}`]: string;
+};
+
+export type MediaPreviews = {
+  image?: VisualPreviews;
+  video?: VisualPreviews;
+  audio?: NonVisualPreviews;
+};
+
 /**
  * Data structure (almost) ready to be stored in DB
  */
@@ -63,17 +76,8 @@ export type MediaProcessResult = {
   width?: number;
   height?: number;
   duration?: number;
-  previews?: {
-    image?: VisualPreviews;
-    video?: VisualPreviews;
-    audio?: NonVisualPreviews;
-  };
-  meta?: {
-    animatedImage?: true;
-  } & {
-    [key: `dc:${string}`]: string;
-  };
-
+  previews?: MediaPreviews;
+  meta?: MediaMetaData;
   files?: FilesToUpload;
 };
 

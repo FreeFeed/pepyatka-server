@@ -475,6 +475,7 @@ describe('Attachments', () => {
           thumbnails2: { h: 350, w: 691, ext: 'webp' },
         },
       });
+      expect(att.meta, 'to equal', { animatedImage: true, silent: true });
     });
   });
 });

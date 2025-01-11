@@ -82,6 +82,15 @@ export async function processMediaFile(
 
     if (info.isAnimatedImage) {
       meta.animatedImage = true;
+      meta.silent = true;
+    }
+
+    if (!info.aCodec) {
+      meta.silent = true;
+    }
+
+    if (!info.aCodec) {
+      meta.silent = true;
     }
 
     let { fileExtension, mimeType } = commonResult;
