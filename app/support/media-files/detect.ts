@@ -156,12 +156,19 @@ async function detectAnimatedImage(
 async function runFfprobe(file: string): Promise<FfprobeResult> {
   const out = await spawnAsync('ffprobe', [
     '-hide_banner',
-    ['-loglevel', 'warning'],
+    ['-loglevel', 'error'],
     '-show_format',
     '-show_streams',
     ['-print_format', 'json'],
     ['-i', file],
   ]);
+
+  if (out.stderr !== '') {
+    // ffprobe can return zero exit code even if it fails to process the file.
+    // In that case, stderr will contain an error message.
+    throw new Error(out.stderr.trim());
+  }
+
   return JSON.parse(out.stdout) as FfprobeResult;
 }
 
