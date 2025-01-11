@@ -70,8 +70,8 @@ export type MediaProcessResult = {
   };
   meta?: {
     animatedImage?: true;
-    'dc:title'?: string;
-    'dc:creator'?: string;
+  } & {
+    [key: `dc:${string}`]: string;
   };
 
   files?: FilesToUpload;

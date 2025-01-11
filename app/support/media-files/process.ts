@@ -29,11 +29,11 @@ export async function processMediaFile(
   origFileName: string,
 ): Promise<MediaProcessResult> {
   const info = await detectMediaType(localFilePath, origFileName);
-  const fileStat = await stat(localFilePath);
+  const { size: fileSize } = await stat(localFilePath);
 
   const commonResult = {
     fileExtension: info.extension,
-    fileSize: fileStat.size,
+    fileSize,
     fileName: origFileName,
     mimeType: mimeLookup(info.extension) || 'application/octet-stream',
     meta: {} as MediaProcessResult['meta'],
