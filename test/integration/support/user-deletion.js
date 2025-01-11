@@ -369,17 +369,7 @@ describe('User data deletion', () => {
     // "Upload" file
     await fs.copyFile(localFile, uploadedFile);
 
-    const stat = await fs.stat(localFile);
-    const att = new Attachment({
-      userId: luna.id,
-      file: {
-        name: path.basename(localFile),
-        size: stat.size,
-        path: uploadedFile,
-        type: 'image/png',
-      },
-    });
-    await att.create();
+    const att = await Attachment.create(uploadedFile, path.basename(localFile), luna);
     await filesMustExist(att);
 
     await deleteAttachments(luna.id, afterHour());

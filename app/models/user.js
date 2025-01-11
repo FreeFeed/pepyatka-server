@@ -1,24 +1,30 @@
 import crypto from 'crypto';
-import { promises as fs, createReadStream } from 'fs';
+import { createReadStream } from 'fs';
 import util from 'util';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { unlink } from 'fs/promises';
 
 import bcrypt from 'bcrypt';
-import gm from 'gm';
 import GraphemeBreaker from 'grapheme-breaker';
 import _ from 'lodash';
 import monitor from 'monitor-dog';
+import mv from 'mv';
 import validator from 'validator';
 import { v4 as uuidv4 } from 'uuid';
 import config from 'config';
 
-import { getS3 } from '../support/s3';
+import { s3Client } from '../support/s3';
 import { BadRequestException, NotFoundException, ValidationException } from '../support/exceptions';
-import { Attachment, Comment, Post, PubSub as pubSub } from '../models';
+import { Comment, Post, PubSub as pubSub } from '../models';
 import { EventService } from '../support/EventService';
 import { userCooldownStart, userDataDeletionStart } from '../jobs/user-gone';
 import { allExternalProviders } from '../support/ExtAuth';
+import { spawnAsync } from '../support/spawn-async';
 
 import { validate as validateUserPrefs } from './user-prefs';
+
+const mvAsync = util.promisify(mv);
 
 const randomBytes = util.promisify(crypto.randomBytes);
 
@@ -938,33 +944,20 @@ export function addModel(dbAdapter) {
       return new Comment(attrs);
     }
 
-    newAttachment(attrs) {
-      attrs.userId = this.id;
-      monitor.increment('users.attachments');
-      return new Attachment(attrs);
-    }
-
     async updateProfilePicture(filePath) {
-      const image = gm(filePath);
-      image.sizeAsync = util.promisify(image.size);
-
-      let originalSize;
+      const uid = uuidv4();
 
       try {
-        originalSize = await image.sizeAsync();
+        await Promise.all(
+          [User.PROFILE_PICTURE_SIZE_LARGE, User.PROFILE_PICTURE_SIZE_MEDIUM].map((size) =>
+            this.saveProfilePictureWithSize(filePath, uid, size),
+          ),
+        );
       } catch {
         throw new BadRequestException('Not an image file');
       }
 
-      this.profilePictureUuid = uuidv4();
-
-      const sizes = [User.PROFILE_PICTURE_SIZE_LARGE, User.PROFILE_PICTURE_SIZE_MEDIUM];
-
-      const promises = sizes.map((size) =>
-        this.saveProfilePictureWithSize(filePath, this.profilePictureUuid, originalSize, size),
-      );
-      await Promise.all(promises);
-
+      this.profilePictureUuid = uid;
       this.updatedAt = new Date().getTime();
 
       const payload = {
@@ -976,46 +969,39 @@ export function addModel(dbAdapter) {
       await pubSub.globalUserUpdate(this.id);
     }
 
-    async saveProfilePictureWithSize(path, uuid, originalSize, size) {
-      const origWidth = originalSize.width;
-      const origHeight = originalSize.height;
+    async saveProfilePictureWithSize(path, uuid, size) {
       const retinaSize = size * 2;
 
-      let image = gm(path);
-      image.writeAsync = util.promisify(image.write);
-
-      if (origWidth > origHeight) {
-        const dx = origWidth - origHeight;
-        image = image.crop(origHeight, origHeight, dx / 2, 0);
-      } else if (origHeight > origWidth) {
-        const dy = origHeight - origWidth;
-        image = image.crop(origWidth, origWidth, 0, dy / 2);
-      }
-
-      image = image
-        .resize(retinaSize, retinaSize)
-        .profile(`${__dirname}/../../lib/assets/sRGB.icm`)
-        .autoOrient()
-        .quality(95);
+      const tmpPictureFile = join(tmpdir(), `resized-${uuid}-${size}`);
+      await spawnAsync('convert', [
+        path,
+        '-auto-orient',
+        '-resize',
+        `${retinaSize}x${retinaSize}^`,
+        '-gravity',
+        'Center',
+        '-extent',
+        `${retinaSize}x${retinaSize}`,
+        '-profile',
+        `${__dirname}/../../lib/assets/sRGB.icm`,
+        '-quality',
+        '95',
+        tmpPictureFile,
+      ]);
 
       if (config.profilePictures.storage.type === 's3') {
-        const tmpPictureFile = `${path}.resized.${size}`;
         const destPictureFile = this.getProfilePictureFilename(uuid, size);
-
-        await image.writeAsync(tmpPictureFile);
         await this.uploadToS3(tmpPictureFile, destPictureFile, config.profilePictures);
-
-        return fs.unlink(tmpPictureFile);
+        await unlink(tmpPictureFile);
+      } else {
+        const destPath = this.getProfilePicturePath(uuid, size);
+        await mvAsync(tmpPictureFile, destPath);
       }
-
-      const destPath = this.getProfilePicturePath(uuid, size);
-      return image.writeAsync(destPath);
     }
 
     // Upload profile picture to the S3 bucket
     async uploadToS3(sourceFile, destFile, subConfig) {
-      const s3 = getS3(subConfig.storage);
-      await s3.putObject({
+      await s3Client().putObject({
         ACL: 'public-read',
         Bucket: subConfig.storage.bucket,
         Key: subConfig.path + destFile,

@@ -48,7 +48,11 @@ mkdir ./public/files/attachments/thumbnails/ && mkdir ./public/files/attachments
 ```
 mkdir -p /tmp/pepyatka-media/attachments/thumbnails
 mkdir -p /tmp/pepyatka-media/attachments/thumbnails2
-mkdir -p /tmp/pepyatka-media/attachments/anotherTestSize
+mkdir -p /tmp/pepyatka-media/attachments/p1
+mkdir -p /tmp/pepyatka-media/attachments/p2
+mkdir -p /tmp/pepyatka-media/attachments/p3
+mkdir -p /tmp/pepyatka-media/attachments/p4
+mkdir -p /tmp/pepyatka-media/attachments/a1
 ```
 
 3. Create config `config/local.json` with some random secret string: `{   "secret": "myverysecretstring"  }`.

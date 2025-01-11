@@ -194,8 +194,23 @@ export class Attachment {
   id: UUID;
   fileSize: number;
   sanitized: number;
+  meta: { animatedImage?: true } & { [key: `dc:${string}`]: string };
+  width: number | null;
+  height: number | null;
+  duration: number | null;
   constructor(params: AttachmentParams);
-  create(): Promise<void>;
+  static create(
+    filePath: string,
+    fileName: string,
+    user: User,
+    postId?: UUID | null,
+  ): Promise<Attachment>;
+  getRelFilePath(variant: string, ext: string): string;
+  getLocalFilePath(variant: string, ext?: string | null): string;
+  getFileUrl(variant: string, ext?: string | null): string;
+  allFileVariants(includeOriginal?: boolean): { variant: string; ext: string }[];
+  allRelFilePaths(includeOriginal?: boolean): string[];
+  maxSizedVariant(mediaType: 'image' | 'video'): string | null;
   downloadOriginal(): Promise<string>;
   sanitizeOriginal(): Promise<boolean>;
   destroy(destroyedBy?: User): Promise<void>;

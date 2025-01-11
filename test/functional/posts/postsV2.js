@@ -5,7 +5,7 @@ import expect from 'unexpected';
 import cleanDB from '../../dbCleaner';
 import { getSingleton } from '../../../app/app';
 import { DummyPublisher } from '../../../app/pubsub';
-import { PubSub } from '../../../app/models';
+import { dbAdapter, PubSub } from '../../../app/models';
 import {
   createUserAsync,
   createAndReturnPost,
@@ -376,6 +376,20 @@ describe('TimelinesControllerV2', () => {
         );
 
         expect(resp, 'to satisfy', { __httpCode: 403 });
+      });
+
+      it('should return information for a post', async () => {
+        await updatePostAsync(luna, { body: luna.post.body, attachments: [attId1] });
+        const att1 = await dbAdapter.getAttachmentById(attId1);
+        const response = await fetchPostOpenGraph(luna.post.id);
+        response.should.include('og:title');
+        response.should.include('luna');
+        response.should.include('<meta property="og:description" content="Luna post" />');
+        response.should.include(
+          `<meta property="og:image" content="${att1.getFileUrl('thumbnails')}" />`,
+        );
+        response.should.include('<meta property="og:image:width" ');
+        response.should.include('<meta property="og:image:height" ');
       });
 
       describe('Luna wrote another post', () => {

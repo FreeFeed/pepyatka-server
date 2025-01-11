@@ -3,10 +3,10 @@ import compose from 'koa-compose';
 import { isInt } from 'validator';
 
 import { reportError, BadRequestException, ValidationException } from '../../../support/exceptions';
-import { serializeAttachment } from '../../../serializers/v2/post';
+import { serializeAttachment } from '../../../serializers/v2/attachment';
 import { serializeUsersByIds } from '../../../serializers/v2/user';
 import { authRequired } from '../../middlewares';
-import { dbAdapter } from '../../../models';
+import { dbAdapter, Attachment } from '../../../models';
 import { startAttachmentsSanitizeJob } from '../../../jobs/attachments-sanitize';
 
 export default class AttachmentsController {
@@ -30,10 +30,7 @@ export default class AttachmentsController {
       }
 
       try {
-        const newAttachment = await user.newAttachment({
-          file: { ...file, path: file.filepath, name: file.originalFilename },
-        });
-        await newAttachment.create();
+        const newAttachment = await Attachment.create(file.filepath, file.originalFilename, user);
 
         ctx.body = {
           attachments: serializeAttachment(newAttachment),

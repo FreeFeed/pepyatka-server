@@ -16,7 +16,6 @@ import {
   updateUserAsync,
   performJSONRequest,
   authHeaders,
-  withModifiedAppConfig,
 } from './functional_test_helper';
 
 const expect = unexpected.clone().use(unexpectedDate);
@@ -45,26 +44,153 @@ describe('Attachments', () => {
     const data = new FormData();
     data.append('file', new Blob(['this is a test'], { type: 'text/plain' }), 'test.txt');
     const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
     expect(resp, 'to satisfy', {
       attachments: {
         fileName: 'test.txt',
         mediaType: 'general',
-        fileSize: 'this is a test'.length,
+        fileSize: 'this is a test'.length.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'txt'),
+        thumbnailUrl: attObj.getFileUrl('', 'txt'),
+        imageSizes: {},
+        createdBy: luna.user.id,
+        postId: null,
       },
       users: [{ id: luna.user.id }],
     });
   });
 
-  it(`should create image attachment`, async () => {
+  it(`should create small image attachment`, async () => {
     const filePath = path.join(__dirname, '../fixtures/test-image.150x150.png');
     const data = new FormData();
     data.append('file', await fileFrom(filePath, 'image/png'));
     const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
     expect(resp, 'to satisfy', {
       attachments: {
         fileName: 'test-image.150x150.png',
         mediaType: 'image',
-        fileSize: fs.statSync(filePath).size,
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'png'),
+        thumbnailUrl: attObj.getFileUrl('', 'png'),
+        imageSizes: { o: { w: 150, h: 150, url: attObj.getFileUrl('', 'png') } },
+        createdBy: luna.user.id,
+        postId: null,
+      },
+      users: [{ id: luna.user.id }],
+    });
+  });
+
+  it(`should create medium image attachment`, async () => {
+    const filePath = path.join(__dirname, '../fixtures/test-image.900x300.png');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'image/png'));
+    const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'test-image.900x300.png',
+        mediaType: 'image',
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'png'),
+        thumbnailUrl: attObj.getFileUrl('thumbnails', 'webp'),
+        imageSizes: {
+          o: { w: 900, h: 300, url: attObj.getFileUrl('', 'png') },
+          t: { w: 525, h: 175, url: attObj.getFileUrl('thumbnails', 'webp') },
+        },
+        createdBy: luna.user.id,
+        postId: null,
+      },
+      users: [{ id: luna.user.id }],
+    });
+  });
+
+  it(`should create large image attachment`, async () => {
+    const filePath = path.join(__dirname, '../fixtures/test-image.3000x2000.png');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'image/png'));
+    const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'test-image.3000x2000.png',
+        mediaType: 'image',
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'png'),
+        thumbnailUrl: attObj.getFileUrl('thumbnails', 'webp'),
+        imageSizes: {
+          o: { w: 2449, h: 1633, url: attObj.getFileUrl('p4', 'webp') },
+          t: { w: 263, h: 175, url: attObj.getFileUrl('thumbnails', 'webp') },
+          t2: { w: 525, h: 350, url: attObj.getFileUrl('thumbnails2', 'webp') },
+        },
+        createdBy: luna.user.id,
+        postId: null,
+      },
+      users: [{ id: luna.user.id }],
+    });
+  });
+
+  it(`should create mp3 audio attachment`, async () => {
+    const filePath = path.join(__dirname, '../fixtures/media-files/music.mp3');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'audio/mpeg'));
+    const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'music.mp3',
+        mediaType: 'audio',
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'mp3'),
+        thumbnailUrl: attObj.getFileUrl('', 'mp3'),
+        imageSizes: {},
+        createdBy: luna.user.id,
+        postId: null,
+        artist: 'Piermic',
+        title: 'Improvisation with Sopranino Recorder',
+      },
+      users: [{ id: luna.user.id }],
+    });
+  });
+
+  it(`should create attachment from animated gif`, async () => {
+    const filePath = path.join(__dirname, '../fixtures/test-image-animated.gif');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'image/gif'));
+    const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    const attObj = await dbAdapter.getAttachmentById(id);
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'test-image-animated.gif',
+        mediaType: 'image',
+        fileSize: fs.statSync(filePath).size.toString(),
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'gif'),
+        thumbnailUrl: attObj.getFileUrl('thumbnails', 'webp'),
+        imageSizes: {
+          o: { w: 774, h: 392, url: attObj.getFileUrl('', 'gif') },
+          t: { w: 346, h: 175, url: attObj.getFileUrl('thumbnails', 'webp') },
+          t2: { w: 691, h: 350, url: attObj.getFileUrl('thumbnails2', 'webp') },
+        },
+        createdBy: luna.user.id,
+        postId: null,
       },
       users: [{ id: luna.user.id }],
     });
@@ -83,7 +209,7 @@ describe('Attachments', () => {
       attachments: {
         fileName: 'test.txt',
         mediaType: 'general',
-        fileSize: 'this is a test'.length,
+        fileSize: 'this is a test'.length.toString(),
       },
       users: [{ id: luna.user.id }],
     });
@@ -172,10 +298,11 @@ describe('Attachments', () => {
 
       for (let i = 0; i < 10; i++) {
         const data = new FormData();
-        data.append('file', new Blob(['this is a test']), {
-          filename: `test${i + 1}.txt`,
-          contentType: 'text/plain',
-        });
+        data.append(
+          'file',
+          new Blob(['this is a test'], { type: 'text/plain' }),
+          `test${i + 1}.txt`,
+        );
         // eslint-disable-next-line no-await-in-loop
         await performJSONRequest('POST', '/v1/attachments', data, authHeaders(mars));
       }
@@ -210,10 +337,11 @@ describe('Attachments', () => {
 
       for (let i = 0; i < 10; i++) {
         const data = new FormData();
-        data.append('file', new Blob(['this is a test']), {
-          filename: `test${i + 1}.txt`,
-          contentType: 'text/plain',
-        });
+        data.append(
+          'file',
+          new Blob(['this is a test'], { type: 'text/plain' }),
+          `test${i + 1}.txt`,
+        );
         // eslint-disable-next-line no-await-in-loop
         await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
       }
@@ -280,52 +408,6 @@ describe('Attachments', () => {
         attachments: { total: 10, sanitized: 10 },
         sanitizeTask: null,
         __httpCode: 200,
-      });
-    });
-  });
-
-  describe(`WebP attachments`, () => {
-    it(`should create WebP attachment with .jpg thumbnails`, async () => {
-      const filePath = path.join(__dirname, '../fixtures/test-image-webp.webp');
-      const data = new FormData();
-      data.append('file', await fileFrom(filePath, 'image/webp'));
-      const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
-      expect(resp, 'to satisfy', {
-        attachments: {
-          fileName: 'test-image-webp.webp',
-          mediaType: 'image',
-          fileSize: fs.statSync(filePath).size,
-          url: expect.it('to end with', '.webp'),
-          thumbnailUrl: expect.it('to end with', '.jpg'),
-          imageSizes: expect.it('to have values satisfying', {
-            url: expect.it('to end with', '.jpg').or('to end with', '.webp'),
-          }),
-        },
-        users: [{ id: luna.user.id }],
-      });
-    });
-
-    describe(`With {useImgProxy:true}`, () => {
-      withModifiedAppConfig({ attachments: { useImgProxy: true } });
-
-      it(`should create WebP attachment with .webp?format=jpg thumbnails`, async () => {
-        const filePath = path.join(__dirname, '../fixtures/test-image-webp.webp');
-        const data = new FormData();
-        data.append('file', await fileFrom(filePath, 'image/webp'));
-        const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
-        expect(resp, 'to satisfy', {
-          attachments: {
-            fileName: 'test-image-webp.webp',
-            mediaType: 'image',
-            fileSize: fs.statSync(filePath).size,
-            url: expect.it('to end with', '.webp'),
-            thumbnailUrl: expect.it('to end with', '.webp?format=jpg'),
-            imageSizes: expect.it('to have values satisfying', {
-              url: expect.it('to end with', '.webp?format=jpg').or('to end with', '.webp'),
-            }),
-          },
-          users: [{ id: luna.user.id }],
-        });
       });
     });
   });
