@@ -196,6 +196,52 @@ describe('Attachments', () => {
     });
   });
 
+  it(`should create attachment from video file`, async () => {
+    const jobManager = await initJobProcessing();
+    const filePath = path.join(__dirname, '../fixtures/media-files/polyphon.mp4');
+    const data = new FormData();
+    data.append('file', await fileFrom(filePath, 'image/gif'));
+    let resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+    const { id } = resp.attachments;
+    let attObj = await dbAdapter.getAttachmentById(id);
+
+    // At first, we should have a stub file
+    expect(resp, 'to satisfy', {
+      attachments: {
+        fileName: 'polyphon.in-progress',
+        mediaType: 'general',
+        fileSize: '29',
+        createdAt: attObj.createdAt.getTime().toString(),
+        updatedAt: attObj.updatedAt.getTime().toString(),
+        url: attObj.getFileUrl('', 'in-progress'),
+        thumbnailUrl: attObj.getFileUrl('', 'in-progress'),
+        imageSizes: expect.it('to equal', {}),
+        createdBy: luna.user.id,
+        postId: null,
+      },
+      users: [{ id: luna.user.id }],
+    });
+
+    // Now execute the job
+    await jobManager.fetchAndProcess();
+
+    // The video should have been processed. In pre-v4 API the video attachments
+    // have a 'general' media type.
+    attObj = await dbAdapter.getAttachmentById(id);
+    resp = await performJSONRequest('GET', '/v1/attachments/my', null, authHeaders(luna));
+    expect(resp.attachments, 'to have an item satisfying', {
+      fileName: 'polyphon.mp4',
+      mediaType: 'general',
+      createdAt: attObj.createdAt.getTime().toString(),
+      updatedAt: attObj.updatedAt.getTime().toString(),
+      url: attObj.getFileUrl('', 'mp4'),
+      thumbnailUrl: attObj.getFileUrl('', 'mp4'),
+      imageSizes: expect.it('to equal', {}),
+      createdBy: luna.user.id,
+      postId: null,
+    });
+  });
+
   it(`should create attachment from any binary form field`, async () => {
     const data = new FormData();
     data.append('name', 'john');

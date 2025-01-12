@@ -1,5 +1,5 @@
 import { readFile, stat, writeFile } from 'fs/promises';
-import { join, resolve, parse as parsePath, basename, extname } from 'path';
+import { join, resolve, parse as parsePath, basename, extname, format, parse } from 'path';
 import { tmpdir } from 'os';
 
 import { v4 as createUuid } from 'uuid';
@@ -15,6 +15,8 @@ import { createUser } from '../helpers/users';
 import { createPost } from '../helpers/posts-and-comments';
 import { spawnAsync } from '../../../app/support/spawn-async';
 import { withModifiedConfig } from '../../helpers/with-modified-config';
+import { initJobProcessing } from '../../../app/jobs';
+import { ATTACHMENT_PREPARE_VIDEO } from '../../../app/jobs/attachment-prepare-video';
 
 import { testFiles } from './attachment-data';
 import { fakeS3Storage } from './fake-s3';
@@ -24,10 +26,11 @@ const fixturesDir = resolve(__dirname, '../../fixtures');
 describe('Attachments', () => {
   before(() => cleanDB(dbAdapter.database));
 
-  let user;
+  let user, jobManager;
   before(async () => {
     // Create user
     user = await createUser('luna');
+    jobManager = await initJobProcessing();
 
     const attConf = currentConfig().attachments;
 
@@ -408,57 +411,186 @@ describe('Attachments', () => {
 
   describe('Video attachments', () => {
     it('should create an h264 video attachment', async () => {
-      const att = await createAndCheckAttachment(testFiles.videoMp4Avc, post, user);
-      expect(att.mimeType, 'to equal', testFiles.videoMp4Avc.type);
-      expect(att.previews, 'to equal', {
-        video: {
-          '': { h: 720, w: 1280, ext: 'mp4' },
-          v1: { h: 480, w: 854, ext: 'mp4' },
-        },
-        image: {
-          p1: { h: 260, w: 462, ext: 'webp' },
-          p2: { h: 474, w: 843, ext: 'webp' },
-          p3: { h: 720, w: 1280, ext: 'webp' },
-          thumbnails: { h: 175, w: 311, ext: 'webp' },
-          thumbnails2: { h: 350, w: 622, ext: 'webp' },
-        },
+      const att = await createAttachment(testFiles.videoMp4Avc, post, user);
+      // At first, we should have a stub file
+      expect(att, 'to satisfy', {
+        mediaType: 'video',
+        fileName: 'polyphon.in-progress',
+        fileExtension: 'in-progress',
+        mimeType: 'text/plain',
+        fileSize: 29,
+        previews: expect.it('to equal', {}),
+        meta: expect.it('to equal', { inProgress: true }),
+        width: null,
+        height: null,
+        duration: null,
       });
+
+      // The video processing job should have been enqueued
+      const jobs = await dbAdapter.getAllJobs();
+      expect(jobs, 'to have an item satisfying', {
+        name: ATTACHMENT_PREPARE_VIDEO,
+        payload: { attId: att.id },
+        uniqKey: att.id,
+        attempts: 0,
+      });
+
+      // Now execute the job
+      await jobManager.fetchAndProcess();
+
+      // The video should have been processed
+      const att2 = await dbAdapter.getAttachmentById(att.id);
+      expect(att2, 'to satisfy', {
+        mediaType: 'video',
+        fileName: 'polyphon.mp4',
+        fileExtension: 'mp4',
+        mimeType: 'video/mp4',
+        previews: expect.it('to equal', {
+          video: {
+            '': { h: 720, w: 1280, ext: 'mp4' },
+            v1: { h: 480, w: 854, ext: 'mp4' },
+          },
+          image: {
+            p1: { h: 260, w: 462, ext: 'webp' },
+            p2: { h: 474, w: 843, ext: 'webp' },
+            p3: { h: 720, w: 1280, ext: 'webp' },
+            thumbnails: { h: 175, w: 311, ext: 'webp' },
+            thumbnails2: { h: 350, w: 622, ext: 'webp' },
+          },
+        }),
+        meta: expect.it('to equal', {}),
+        width: 1280,
+        height: 720,
+        duration: 5.005,
+      });
+
+      // All files should exist
+      await checkAttachmentFiles(att2);
+
+      // The stub file should have been deleted
+      await filesMustExist(att, false);
     });
 
     it('should create an Ogv video attachment', async () => {
-      const att = await createAndCheckAttachment(testFiles.videoOgv, post, user);
-      expect(att.mimeType, 'to equal', testFiles.videoOgv.type);
-      expect(att.previews, 'to equal', {
-        video: {
-          '': { h: 720, w: 1280, ext: 'mp4' },
-          v1: { h: 480, w: 854, ext: 'mp4' },
-        },
-        image: {
-          p1: { h: 260, w: 462, ext: 'webp' },
-          p2: { h: 474, w: 843, ext: 'webp' },
-          p3: { h: 720, w: 1280, ext: 'webp' },
-          thumbnails: { h: 175, w: 311, ext: 'webp' },
-          thumbnails2: { h: 350, w: 622, ext: 'webp' },
-        },
+      const att = await createAttachment(testFiles.videoOgv, post, user);
+      // At first, we should have a stub file
+      expect(att, 'to satisfy', {
+        mediaType: 'video',
+        fileName: 'polyphon.in-progress',
+        fileExtension: 'in-progress',
+        mimeType: 'text/plain',
+        fileSize: 29,
+        previews: expect.it('to equal', {}),
+        meta: expect.it('to equal', { inProgress: true }),
+        width: null,
+        height: null,
+        duration: null,
       });
+
+      // The video processing job should have been enqueued
+      const jobs = await dbAdapter.getAllJobs();
+      expect(jobs, 'to have an item satisfying', {
+        name: ATTACHMENT_PREPARE_VIDEO,
+        payload: { attId: att.id },
+        uniqKey: att.id,
+        attempts: 0,
+      });
+
+      // Now execute the job
+      await jobManager.fetchAndProcess();
+
+      // The video should have been processed
+      const att2 = await dbAdapter.getAttachmentById(att.id);
+      expect(att2, 'to satisfy', {
+        mediaType: 'video',
+        fileName: 'polyphon.mp4',
+        fileExtension: 'mp4',
+        mimeType: 'video/mp4',
+        previews: expect.it('to equal', {
+          video: {
+            '': { h: 720, w: 1280, ext: 'mp4' },
+            v1: { h: 480, w: 854, ext: 'mp4' },
+          },
+          image: {
+            p1: { h: 260, w: 462, ext: 'webp' },
+            p2: { h: 474, w: 843, ext: 'webp' },
+            p3: { h: 720, w: 1280, ext: 'webp' },
+            thumbnails: { h: 175, w: 311, ext: 'webp' },
+            thumbnails2: { h: 350, w: 622, ext: 'webp' },
+          },
+        }),
+        meta: expect.it('to equal', {}),
+        width: 1280,
+        height: 720,
+        duration: 4.993,
+      });
+
+      // All files should exist
+      await checkAttachmentFiles(att2);
+
+      // The stub file should have been deleted
+      await filesMustExist(att, false);
     });
 
     it('should create a small h264 video attachment', async () => {
-      const att = await createAndCheckAttachment(testFiles.mov, post, user);
-      expect(att.mimeType, 'to equal', testFiles.mov.type);
-      expect(att.previews, 'to equal', {
-        video: {
-          '': { h: 710, w: 1572, ext: 'mp4' },
-          v1: { h: 480, w: 1062, ext: 'mp4' },
-        },
-        image: {
-          p1: { h: 233, w: 515, ext: 'webp' },
-          p2: { h: 425, w: 941, ext: 'webp' },
-          p3: { h: 710, w: 1572, ext: 'webp' },
-          thumbnails: { h: 175, w: 387, ext: 'webp' },
-          thumbnails2: { h: 350, w: 775, ext: 'webp' },
-        },
+      const att = await createAttachment(testFiles.mov, post, user);
+      // At first, we should have a stub file
+      expect(att, 'to satisfy', {
+        mediaType: 'video',
+        fileName: 'test-quicktime-video.in-progress',
+        fileExtension: 'in-progress',
+        mimeType: 'text/plain',
+        fileSize: 29,
+        previews: expect.it('to equal', {}),
+        meta: expect.it('to equal', { silent: true, inProgress: true }),
+        width: null,
+        height: null,
+        duration: null,
       });
+
+      // The video processing job should have been enqueued
+      const jobs = await dbAdapter.getAllJobs();
+      expect(jobs, 'to have an item satisfying', {
+        name: ATTACHMENT_PREPARE_VIDEO,
+        payload: { attId: att.id },
+        uniqKey: att.id,
+        attempts: 0,
+      });
+
+      // Now execute the job
+      await jobManager.fetchAndProcess();
+
+      // The video should have been processed
+      const att2 = await dbAdapter.getAttachmentById(att.id);
+      expect(att2, 'to satisfy', {
+        mediaType: 'video',
+        fileName: 'test-quicktime-video.mp4',
+        fileExtension: 'mp4',
+        mimeType: 'video/mp4',
+        previews: expect.it('to equal', {
+          video: {
+            '': { h: 710, w: 1572, ext: 'mp4' },
+            v1: { h: 480, w: 1062, ext: 'mp4' },
+          },
+          image: {
+            p1: { h: 233, w: 515, ext: 'webp' },
+            p2: { h: 425, w: 941, ext: 'webp' },
+            p3: { h: 710, w: 1572, ext: 'webp' },
+            thumbnails: { h: 175, w: 387, ext: 'webp' },
+            thumbnails2: { h: 350, w: 775, ext: 'webp' },
+          },
+        }),
+        meta: expect.it('to equal', { silent: true }),
+        width: 1572,
+        height: 710,
+        duration: 2.9815,
+      });
+
+      // All files should exist
+      await checkAttachmentFiles(att2);
+
+      // The stub file should have been deleted
+      await filesMustExist(att, false);
     });
 
     it('should create a video attachment from animated gif', async () => {
@@ -488,22 +620,13 @@ async function uploadFile(fileObject) {
   return path;
 }
 
-async function createAndCheckAttachment(fileObject, post, user) {
+async function createAttachment(fileObject, post, user) {
   const path = await uploadFile(fileObject);
   const baseName = basename(fileObject.name);
-  const att = await Attachment.create(path, baseName, user, post?.id);
+  return await Attachment.create(path, baseName, user, post?.id);
+}
 
-  expect(att, 'to be a', Attachment);
-  expect(att.mediaType, 'to be one of', ['image', 'audio', 'video', 'general']);
-  expect(att.fileName, 'to be', baseName);
-
-  if (fileObject.size >= 0) {
-    expect(att.fileSize, 'to be', fileObject.size);
-  }
-
-  expect(att.mimeType, 'to be', fileObject.type);
-  expect(att.fileExtension, 'to be', fileObject.extension ?? extname(fileObject.name).slice(1));
-
+async function checkAttachmentFiles(att) {
   if (currentConfig().attachments.storage.type === 's3') {
     // Original should be uploaded
     const origKey = att.getRelFilePath('', att.fileExtension);
@@ -516,12 +639,7 @@ async function createAndCheckAttachment(fileObject, post, user) {
       ContentDisposition: att.getContentDisposition(att.fileName),
     });
 
-    if (fileObject.size) {
-      expect(fakeS3Storage.get(origKey).Body, 'to have length', fileObject.size);
-    } else {
-      // Just checking for not-zero size
-      expect(fakeS3Storage.get(origKey).Body, 'to be non-empty');
-    }
+    expect(fakeS3Storage.get(origKey).Body, 'to have length', att.fileSize);
 
     // All previews should be uploaded
     for (const { variant, ext } of att.allFileVariants()) {
@@ -540,12 +658,7 @@ async function createAndCheckAttachment(fileObject, post, user) {
     const { rootDir } = currentConfig().attachments.storage;
     const { size } = await stat(join(rootDir, att.getRelFilePath('', att.fileExtension)));
 
-    if (fileObject.size >= 0) {
-      expect(size, 'to be', fileObject.size);
-    } else {
-      // Just checking for not-zero size
-      expect(size, 'to be above', 0);
-    }
+    expect(size, 'to be', att.fileSize);
 
     // All previews should be created
     await Promise.all(
@@ -555,6 +668,26 @@ async function createAndCheckAttachment(fileObject, post, user) {
       }),
     );
   }
+}
+
+async function createAndCheckAttachment(fileObject, post, user) {
+  const path = await uploadFile(fileObject);
+  const baseName = basename(fileObject.name);
+  const att = await Attachment.create(path, baseName, user, post?.id);
+  const fileName = format({ name: parse(baseName).name, ext: att.fileExtension });
+
+  expect(att, 'to be a', Attachment);
+  expect(att.mediaType, 'to be one of', ['image', 'audio', 'video', 'general']);
+  expect(att.fileName, 'to be', fileName);
+
+  if (fileObject.size >= 0) {
+    expect(att.fileSize, 'to be', fileObject.size);
+  }
+
+  expect(att.mimeType, 'to be', fileObject.type);
+  expect(att.fileExtension, 'to be', fileObject.extension ?? extname(fileObject.name).slice(1));
+
+  await checkAttachmentFiles(att);
 
   return att;
 }

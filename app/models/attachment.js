@@ -1,10 +1,10 @@
 import { promises as fs, createReadStream } from 'fs';
-import { join, parse as parsePath } from 'path';
+import { extname, join, parse as parsePath } from 'path';
 import util from 'util';
 import os from 'os';
 
 import createDebug from 'debug';
-import mime from 'mime-types';
+import mime, { lookup } from 'mime-types';
 import mv from 'mv';
 import Raven from 'raven';
 import monitor from 'monitor-dog';
@@ -13,6 +13,7 @@ import { s3Client } from '../support/s3';
 import { sanitizeMediaMetadata, SANITIZE_NONE, SANITIZE_VERSION } from '../support/sanitize-media';
 import { processMediaFile } from '../support/media-files/process';
 import { currentConfig } from '../support/app-async-context';
+import { createPrepareVideoJob } from '../jobs/attachment-prepare-video';
 
 const mvAsync = util.promisify(mv);
 
@@ -139,23 +140,94 @@ export function addModel(dbAdapter) {
       /** @type {Attachment} */
       const object = await dbAdapter.getAttachmentById(id);
 
-      const storageConfig = currentConfig().attachments.storage;
+      if (object.meta.inProgress) {
+        await createPrepareVideoJob({ attId: id, filePath: files['original'].path });
+        delete files['original'];
+      }
 
       // Upload or move files
+      await object._placeFiles(files);
+
+      monitor.increment('users.attachments');
+      return object;
+    }
+
+    /**
+     * Finalize attachment creation (called from the ATTACHMENT_PREPARE_VIDEO
+     * job handler). This method doesn't update attachment object itself.
+     *
+     * @param {string} filePath
+     * @returns {Promise<void>}
+     */
+    async finalizeCreation(filePath) {
+      try {
+        const { files = {}, ...mediaData } = await processMediaFile(filePath, this.fileName, {
+          synchronous: true,
+        });
+
+        if (!files['']) {
+          throw new Error('No original file to upload');
+        }
+
+        // Upload or move files
+        await this._placeFiles(files);
+
+        // Delete stub file
+        await this.deleteFiles();
+
+        // Update data
+        await dbAdapter.updateAttachment(this.id, { ...mediaData, updatedAt: 'now' });
+      } catch (err) {
+        debug(`finalizeCreation error: ${err.message}, treat file as 'general' type`);
+
+        const { size: fileSize } = await fs.stat(filePath);
+        const ext = extname(this.fileName)
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '') // Only the restricted set of chars is allowed
+          .slice(0, 6); // Limit the length of the extension
+
+        // Upload or move files
+        await this._placeFiles({ '': { path: filePath, ext } });
+
+        // Delete stub file
+        await this.deleteFiles();
+
+        // Update data
+        const toUpdate = {
+          updatedAt: 'now',
+          mediaType: 'general',
+          fileExtension: ext,
+          fileSize,
+          mimeType: lookup(ext) || 'application/octet-stream',
+          previews: {},
+          meta: {},
+          width: null,
+          height: null,
+          duration: null,
+        };
+        await dbAdapter.updateAttachment(this.id, toUpdate);
+      }
+    }
+
+    /**
+     * Upload or move processed files (original or previews)
+     *
+     * @param {import('../support/media-files/types').FilesToUpload} files
+     * @returns {Promise<void>}
+     */
+    async _placeFiles(files) {
+      const storageConfig = currentConfig().attachments.storage;
       await Promise.all(
         Object.entries(files).map(async ([variant, { path, ext }]) => {
           if (storageConfig.type === 's3') {
             const mimeType = mime.lookup(ext) || 'application/octet-stream';
-            await object.uploadToS3(path, object.getRelFilePath(variant, ext), mimeType);
+            await this.uploadToS3(path, this.getRelFilePath(variant, ext), mimeType);
             await fs.unlink(path);
           } else {
-            await mvAsync(path, object.getLocalFilePath(variant, ext), { mkdirp: true });
+            await mvAsync(path, this.getLocalFilePath(variant, ext), { mkdirp: true });
           }
         }),
       );
-
-      monitor.increment('users.attachments');
-      return object;
     }
 
     /**

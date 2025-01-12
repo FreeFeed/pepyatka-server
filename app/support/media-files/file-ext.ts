@@ -45,7 +45,7 @@ export function addFileExtension<T extends TypeInfo>(
   const ext = extname(fileName);
 
   if (!ext) {
-    extension = 'dat';
+    extension = '';
   } else {
     extension = ext
       .toLowerCase()

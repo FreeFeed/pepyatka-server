@@ -53,6 +53,7 @@ export type MediaInfo = MediaInfoImage | MediaInfoVideo | MediaInfoAudio | Media
 export type MediaMetaData = {
   animatedImage?: true;
   silent?: true;
+  inProgress?: true;
 } & {
   [key: `dc:${string}`]: string;
 };

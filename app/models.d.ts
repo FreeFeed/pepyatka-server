@@ -194,6 +194,8 @@ type AttachmentParams = {
 };
 export class Attachment {
   id: UUID;
+  fileName: string;
+  fileExtension: string;
   fileSize: number;
   sanitized: number;
   previews: MediaPreviews;
@@ -208,6 +210,7 @@ export class Attachment {
     user: User,
     postId?: UUID | null,
   ): Promise<Attachment>;
+  finalizeCreation(filePath: string): Promise<void>;
   getRelFilePath(variant: string, ext: string): string;
   getLocalFilePath(variant: string, ext?: string | null): string;
   getFileUrl(variant: string, ext?: string | null): string;

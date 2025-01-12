@@ -1,4 +1,5 @@
-import { stat, unlink } from 'fs/promises';
+import { stat, unlink, writeFile } from 'fs/promises';
+import { format, parse } from 'path';
 
 import { lookup as mimeLookup } from 'mime-types';
 import { exiftool } from 'exiftool-vendored';
@@ -18,6 +19,13 @@ import {
 } from './types';
 import { getImagePreviewSizes, getVideoPreviewSizes } from './geometry';
 
+type FileProps = {
+  fileName: string;
+  fileExtension: string;
+  fileSize: number;
+  mimeType: string;
+};
+
 /**
  * Process media file:
  * 1. Detect media type
@@ -27,15 +35,15 @@ import { getImagePreviewSizes, getVideoPreviewSizes } from './geometry';
 export async function processMediaFile(
   localFilePath: string,
   origFileName: string,
+  {
+    // Process media in this function call, don't create delayed processing job
+    synchronous = false,
+  } = {},
 ): Promise<MediaProcessResult> {
   const info = await detectMediaType(localFilePath, origFileName);
-  const { size: fileSize } = await stat(localFilePath);
 
   const commonResult = {
-    fileExtension: info.extension,
-    fileSize,
-    fileName: origFileName,
-    mimeType: mimeLookup(info.extension) || 'application/octet-stream',
+    ...(await fileProps(localFilePath, origFileName, info.extension)),
     meta: {} as MediaProcessResult['meta'],
     width: undefined as number | undefined,
     height: undefined as number | undefined,
@@ -77,7 +85,6 @@ export async function processMediaFile(
   }
 
   if (info.type === 'video') {
-    const [previews, files] = await processVideo(info, localFilePath);
     const meta: MediaProcessResult['meta'] = {};
 
     if (info.isAnimatedImage) {
@@ -89,30 +96,55 @@ export async function processMediaFile(
       meta.silent = true;
     }
 
-    if (!info.aCodec) {
-      meta.silent = true;
+    if (!info.isAnimatedImage && !synchronous) {
+      // Truly video, should create processing task
+      const stubContent = 'This file is being processed.';
+      const stubFilePath = tmpFileVariant(localFilePath, '', 'in-progress');
+      await writeFile(stubFilePath, stubContent);
+
+      meta.inProgress = true;
+
+      return {
+        mediaType: 'video',
+        ...commonResult,
+        ...(await fileProps(stubFilePath, origFileName, 'in-progress')),
+        mimeType: 'text/plain',
+        duration: undefined,
+        width: undefined,
+        height: undefined,
+        previews: {},
+        meta,
+        files: {
+          '': { path: stubFilePath, ext: 'in-progress' },
+          original: { path: localFilePath, ext: info.extension },
+        },
+      };
     }
 
-    let { fileExtension, mimeType } = commonResult;
+    const [previews, files] = await processVideo(info, localFilePath);
 
-    // For video files we may not keep the original, so get extension from the
-    // '' file
-    for (const [variant, { ext }] of Object.entries(files)) {
-      if (variant === '') {
-        fileExtension = ext;
-        mimeType = mimeLookup(ext) || 'application/octet-stream';
-      }
+    let origProps: Partial<FileProps & { width: number; height: number }> = {};
+
+    // For video files we may not keep the original, so get some props from the '' file
+    const origFile = files[''];
+    const origPreview = previews.video?.[''];
+
+    if (origFile) {
+      origProps = await fileProps(origFile.path, origFileName, origFile.ext);
+    }
+
+    if (origPreview) {
+      origProps.width = origPreview.w;
+      origProps.height = origPreview.h;
     }
 
     return {
       mediaType: 'video',
       ...commonResult,
-      fileExtension,
-      mimeType,
-      duration: info.duration,
+      ...origProps,
       previews,
-      files,
       meta,
+      files,
     };
   }
 
@@ -448,4 +480,14 @@ function canUseOriginalVideoStream(info: MediaInfoVideo, maxPreviewSize: Box): b
     info.width === maxPreviewSize.width &&
     info.height === maxPreviewSize.height
   );
+}
+
+async function fileProps(filePath: string, origFileName: string, ext: string): Promise<FileProps> {
+  const fileName = format({ name: parse(origFileName).name, ext });
+  return {
+    fileName,
+    fileExtension: ext,
+    fileSize: await stat(filePath).then((s) => s.size),
+    mimeType: mimeLookup(ext) || 'application/octet-stream',
+  };
 }
