@@ -128,6 +128,7 @@ config.media = {
     'image/png',
     'image/gif',
     'image/webp',
+    'image/avif',
     'audio/mpeg',
     'audio/mp4',
     'audio/ogg',
