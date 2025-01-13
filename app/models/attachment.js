@@ -232,26 +232,22 @@ export function addModel(dbAdapter) {
 
     /**
      * @param {string} variant
-     * @param {string} ext
+     * @param {string|null} ext
      * @return {string}
      */
-    getRelFilePath(variant, ext) {
+    getRelFilePath(variant, ext = null) {
+      if (ext === null) {
+        ext = this.allFileVariants().find(({ variant: v }) => v === variant)?.ext ?? 'unknown';
+      }
+
       return `${currentConfig().attachments.path}${variant ? `${variant}/` : ''}${this.id}${ext ? `.${ext}` : ''}`;
     }
 
     getLocalFilePath(variant, ext = null) {
-      if (ext === null) {
-        ext = this.allFileVariants().find(({ variant: v }) => v === variant)?.ext || 'unknown';
-      }
-
       return currentConfig().attachments.storage.rootDir + this.getRelFilePath(variant, ext);
     }
 
     getFileUrl(variant, ext = null) {
-      if (ext === null) {
-        ext = this.allFileVariants().find(({ variant: v }) => v === variant)?.ext || 'unknown';
-      }
-
       return currentConfig().attachments.url + this.getRelFilePath(variant, ext);
     }
 

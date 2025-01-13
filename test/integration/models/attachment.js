@@ -1,5 +1,5 @@
 import { readFile, stat, writeFile } from 'fs/promises';
-import { join, resolve, parse as parsePath, basename, extname, format, parse } from 'path';
+import { join, resolve, parse as parsePath, basename, extname } from 'path';
 import { tmpdir } from 'os';
 
 import { v4 as createUuid } from 'uuid';
@@ -375,6 +375,116 @@ describe('Attachments', () => {
         },
       });
     });
+
+    describe('File extensions', () => {
+      // Use a fake S3 storage to check the content-disposition
+      const storageConfig = {
+        type: 's3',
+        region: 'fake',
+        accessKeyId: 'foo',
+        secretAccessKey: 'bar',
+        bucket: 'bucket',
+      };
+      withModifiedConfig({
+        media: { storage: storageConfig },
+        attachments: { storage: storageConfig },
+      });
+      before(() => fakeS3Storage.clear());
+
+      it("should create a 'general' attachment without extension", async () => {
+        const content = 'Test file';
+        const fileName = 'test';
+        const path = await createTempFile(content);
+
+        const att = await Attachment.create(path, fileName, user);
+        expect(att, 'to satisfy', {
+          fileName,
+          fileExtension: '',
+          mimeType: 'application/octet-stream',
+        });
+        expect(att.allRelFilePaths(), 'to satisfy', [`attachments/${att.id}`]);
+        expect(fakeS3Storage.get(att.getRelFilePath('')), 'to satisfy', {
+          ContentDisposition: expect.it('to start with', 'attachment; filename="test"'),
+        });
+      });
+
+      it("should create a 'general' attachment with EXE extension", async () => {
+        const content = 'Test EXE file';
+        const fileName = 'test.exe';
+        const path = await createTempFile(content);
+
+        const att = await Attachment.create(path, fileName, user);
+        expect(att, 'to satisfy', {
+          fileName,
+          fileExtension: 'exe',
+          mimeType: 'application/x-msdos-program',
+        });
+        expect(att.allRelFilePaths(), 'to satisfy', [`attachments/${att.id}.exe`]);
+        expect(fakeS3Storage.get(att.getRelFilePath('')), 'to satisfy', {
+          ContentDisposition: expect.it('to start with', 'attachment; filename="test.exe"'),
+        });
+      });
+
+      it("should create a 'general' attachment with PDF extension (should has 'inline' content-disposition)", async () => {
+        const content = 'Test PDF file';
+        const fileName = 'TEST.PDF';
+        const path = await createTempFile(content);
+
+        const att = await Attachment.create(path, fileName, user);
+        expect(att, 'to satisfy', {
+          fileName,
+          fileExtension: 'pdf',
+          mimeType: 'application/pdf',
+        });
+        expect(att.allRelFilePaths(), 'to satisfy', [`attachments/${att.id}.pdf`]);
+        expect(fakeS3Storage.get(att.getRelFilePath('')), 'to satisfy', {
+          ContentDisposition: expect.it('to start with', 'inline; filename="TEST.pdf"'),
+        });
+      });
+
+      it("should create a 'general' attachment with TXT extension (should has 'inline' content-disposition)", async () => {
+        const content = 'Test TXT file';
+        const fileName = 'TEST.TXT';
+        const path = await createTempFile(content);
+
+        const att = await Attachment.create(path, fileName, user);
+        expect(att, 'to satisfy', {
+          fileName,
+          fileExtension: 'txt',
+          mimeType: 'text/plain',
+        });
+        expect(att.allRelFilePaths(), 'to satisfy', [`attachments/${att.id}.txt`]);
+        expect(fakeS3Storage.get(att.getRelFilePath('')), 'to satisfy', {
+          ContentDisposition: expect.it('to start with', 'inline; filename="TEST.txt"'),
+        });
+      });
+
+      it("should create an 'image' attachment with JPEG extension (should has 'inline' content-disposition)", async () => {
+        const fileName = 'TEST.JPEG';
+        const path = await uploadFile({ name: 'media-files/squirrel.jpg' });
+
+        const att = await Attachment.create(path, fileName, user);
+        expect(att, 'to satisfy', {
+          fileName,
+          fileExtension: 'jpg',
+          mimeType: 'image/jpeg',
+        });
+        expect(att.allRelFilePaths(), 'to satisfy', [
+          `attachments/${att.id}.jpg`,
+          `attachments/p1/${att.id}.webp`,
+          `attachments/p2/${att.id}.webp`,
+          `attachments/p3/${att.id}.webp`,
+          `attachments/thumbnails/${att.id}.webp`,
+          `attachments/thumbnails2/${att.id}.webp`,
+        ]);
+        expect(fakeS3Storage.get(att.getRelFilePath('')), 'to satisfy', {
+          ContentDisposition: expect.it('to start with', 'inline; filename="TEST.jpg"'),
+        });
+        expect(fakeS3Storage.get(att.getRelFilePath('p1')), 'to satisfy', {
+          ContentDisposition: expect.it('to start with', 'inline; filename="TEST.webp"'),
+        });
+      });
+    });
   });
 
   describe('S3 storage', () => {
@@ -389,6 +499,7 @@ describe('Attachments', () => {
       media: { storage: storageConfig },
       attachments: { storage: storageConfig },
     });
+    before(() => fakeS3Storage.clear());
 
     it('should create a small attachment on S3', () =>
       createAndCheckAttachment(testFiles.small, post, user));
@@ -415,7 +526,7 @@ describe('Attachments', () => {
       // At first, we should have a stub file
       expect(att, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'polyphon.in-progress',
+        fileName: 'polyphon.mp4',
         fileExtension: 'in-progress',
         mimeType: 'text/plain',
         fileSize: 29,
@@ -476,7 +587,7 @@ describe('Attachments', () => {
       // At first, we should have a stub file
       expect(att, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'polyphon.in-progress',
+        fileName: 'polyphon.ogv',
         fileExtension: 'in-progress',
         mimeType: 'text/plain',
         fileSize: 29,
@@ -503,7 +614,7 @@ describe('Attachments', () => {
       const att2 = await dbAdapter.getAttachmentById(att.id);
       expect(att2, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'polyphon.mp4',
+        fileName: 'polyphon.ogv',
         fileExtension: 'mp4',
         mimeType: 'video/mp4',
         previews: expect.it('to equal', {
@@ -537,7 +648,7 @@ describe('Attachments', () => {
       // At first, we should have a stub file
       expect(att, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'test-quicktime-video.in-progress',
+        fileName: 'test-quicktime-video.mov',
         fileExtension: 'in-progress',
         mimeType: 'text/plain',
         fileSize: 29,
@@ -564,7 +675,7 @@ describe('Attachments', () => {
       const att2 = await dbAdapter.getAttachmentById(att.id);
       expect(att2, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'test-quicktime-video.mp4',
+        fileName: 'test-quicktime-video.mov',
         fileExtension: 'mp4',
         mimeType: 'video/mp4',
         previews: expect.it('to equal', {
@@ -613,10 +724,14 @@ describe('Attachments', () => {
 });
 
 async function uploadFile(fileObject) {
+  const data = await readFile(resolve(fixturesDir, fileObject.name));
+  return await createTempFile(data);
+}
+
+async function createTempFile(content) {
   const tmpDir = tmpdir();
   const path = join(tmpDir, `upl-${createUuid()}`);
-  const data = await readFile(resolve(fixturesDir, fileObject.name));
-  await writeFile(path, data);
+  await writeFile(path, content);
   return path;
 }
 
@@ -674,11 +789,10 @@ async function createAndCheckAttachment(fileObject, post, user) {
   const path = await uploadFile(fileObject);
   const baseName = basename(fileObject.name);
   const att = await Attachment.create(path, baseName, user, post?.id);
-  const fileName = format({ name: parse(baseName).name, ext: att.fileExtension });
 
   expect(att, 'to be a', Attachment);
   expect(att.mediaType, 'to be one of', ['image', 'audio', 'video', 'general']);
-  expect(att.fileName, 'to be', fileName);
+  expect(att.fileName, 'to be', baseName);
 
   if (fileObject.size >= 0) {
     expect(att.fileSize, 'to be', fileObject.size);

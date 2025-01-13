@@ -1,5 +1,4 @@
 import { stat, unlink, writeFile } from 'fs/promises';
-import { format, parse } from 'path';
 
 import { lookup as mimeLookup } from 'mime-types';
 import { exiftool } from 'exiftool-vendored';
@@ -483,10 +482,9 @@ function canUseOriginalVideoStream(info: MediaInfoVideo, maxPreviewSize: Box): b
 }
 
 async function fileProps(filePath: string, origFileName: string, ext: string): Promise<FileProps> {
-  const fileName = format({ name: parse(origFileName).name, ext });
   return {
-    fileName,
-    fileExtension: ext,
+    fileName: origFileName, // File name is always equal to the original file name
+    fileExtension: ext, // This is the extension of the '' variant, i.e. the file in the /attachments/ root
     fileSize: await stat(filePath).then((s) => s.size),
     mimeType: mimeLookup(ext) || 'application/octet-stream',
   };

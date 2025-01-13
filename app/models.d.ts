@@ -211,7 +211,7 @@ export class Attachment {
     postId?: UUID | null,
   ): Promise<Attachment>;
   finalizeCreation(filePath: string): Promise<void>;
-  getRelFilePath(variant: string, ext: string): string;
+  getRelFilePath(variant: string, ext?: string | null): string;
   getLocalFilePath(variant: string, ext?: string | null): string;
   getFileUrl(variant: string, ext?: string | null): string;
   allFileVariants(includeOriginal?: boolean): { variant: string; ext: string }[];
