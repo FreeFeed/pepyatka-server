@@ -1,22 +1,27 @@
 /* eslint-env node, mocha */
-/* global $pg_database */
+/* global $pg_database, $database */
 import fs from 'fs';
 import path from 'path';
 
 import unexpected from 'unexpected';
 import unexpectedDate from 'unexpected-date';
 import { Blob, fileFrom } from 'node-fetch';
+import { beforeEach } from 'mocha';
 
 import cleanDB from '../dbCleaner';
-import { dbAdapter } from '../../app/models';
+import { dbAdapter, PubSub } from '../../app/models';
 import { initJobProcessing } from '../../app/jobs';
+import { eventNames, PubSubAdapter } from '../../app/support/PubSubAdapter';
+import { getSingleton } from '../../app/app';
 
 import {
   createTestUser,
   updateUserAsync,
   performJSONRequest,
   authHeaders,
+  justCreatePost,
 } from './functional_test_helper';
+import Session from './realtime-session';
 
 const expect = unexpected.clone().use(unexpectedDate);
 
@@ -455,6 +460,105 @@ describe('Attachments', () => {
         sanitizeTask: null,
         __httpCode: 200,
       });
+    });
+  });
+
+  describe('Realtime events for attachments processing', () => {
+    let jobManager;
+    before(async () => {
+      const pubsubAdapter = new PubSubAdapter($database);
+      PubSub.setPublisher(pubsubAdapter);
+      jobManager = await initJobProcessing();
+    });
+
+    /** @type {Session} */
+    let lunaSubscribedToHerChannel;
+    /** @type {Session} */
+    let lunaSubscribedToPost;
+    /** @type {Session} */
+    let lunaSubscribedToAttachment;
+    /** @type {Session} */
+    let anonSubscribedToPost;
+    /** @type {Session} */
+    let anonSubscribedToAttachment;
+
+    beforeEach(async () => {
+      const app = await getSingleton();
+      const port = process.env.PEPYATKA_SERVER_PORT || app.context.config.port;
+
+      lunaSubscribedToHerChannel = await Session.create(port, 'Luna subscribed to her channel');
+      await lunaSubscribedToHerChannel.sendAsync('auth', { authToken: luna.authToken });
+
+      lunaSubscribedToPost = await Session.create(port, 'Luna subscribed to post');
+      await lunaSubscribedToPost.sendAsync('auth', { authToken: luna.authToken });
+
+      lunaSubscribedToAttachment = await Session.create(port, 'Luna subscribed to attachment');
+      await lunaSubscribedToAttachment.sendAsync('auth', { authToken: luna.authToken });
+
+      anonSubscribedToPost = await Session.create(port, 'Anonymous subscribed to post');
+      anonSubscribedToAttachment = await Session.create(port, 'Anonymous subscribed to attachment');
+    });
+    afterEach(() =>
+      [
+        lunaSubscribedToHerChannel,
+        lunaSubscribedToPost,
+        lunaSubscribedToAttachment,
+        anonSubscribedToPost,
+        anonSubscribedToAttachment,
+      ].forEach((s) => s.disconnect()),
+    );
+
+    it(`should send realtime events to the listener's channels`, async () => {
+      // Create an attachment
+      const filePath = path.join(__dirname, '../fixtures/media-files/polyphon.mp4');
+      const data = new FormData();
+      data.append('file', await fileFrom(filePath, 'image/gif'));
+      const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+      const { id: attId } = resp.attachments;
+
+      const post = await justCreatePost(luna, `Luna post`);
+      await post.linkAttachments([attId]);
+
+      await Promise.all([
+        lunaSubscribedToHerChannel.sendAsync('subscribe', { user: [luna.user.id] }),
+        lunaSubscribedToPost.sendAsync('subscribe', { post: [post.id] }),
+        lunaSubscribedToAttachment.sendAsync('subscribe', { attachment: [attId] }),
+        anonSubscribedToPost.sendAsync('subscribe', { post: [post.id] }),
+        anonSubscribedToAttachment.sendAsync('subscribe', { attachment: [attId] }),
+      ]);
+
+      // Run processing
+      [
+        lunaSubscribedToHerChannel,
+        lunaSubscribedToPost,
+        lunaSubscribedToAttachment,
+        anonSubscribedToPost,
+        anonSubscribedToAttachment,
+      ].forEach((s) => (s.collected.length = 0));
+
+      await jobManager.fetchAndProcess();
+
+      const events = await Promise.all([
+        lunaSubscribedToHerChannel.haveCollected(eventNames.ATTACHMENT_UPDATE),
+        lunaSubscribedToPost.haveCollected(eventNames.POST_UPDATED),
+        lunaSubscribedToAttachment.haveCollected(eventNames.ATTACHMENT_UPDATE),
+        anonSubscribedToPost.haveCollected(eventNames.POST_UPDATED),
+        anonSubscribedToAttachment.haveCollected(eventNames.ATTACHMENT_UPDATE),
+      ]);
+
+      expect(events, 'to satisfy', [
+        { attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }] },
+        {
+          posts: { id: post.id },
+          attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
+        },
+        { attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }] },
+        {
+          posts: { id: post.id },
+          attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
+        },
+        { attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }] },
+      ]);
     });
   });
 });

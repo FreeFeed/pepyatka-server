@@ -17,6 +17,7 @@ export const eventNames = {
   GLOBAL_USER_UPDATED: 'global:user:update',
   GROUP_TIMES_UPDATED: ':GROUP_TIMES_UPDATED',
   EVENT_CREATED: 'event:new',
+  ATTACHMENT_UPDATE: 'attachment:update',
 } as const;
 
 export type EventName = (typeof eventNames)[keyof typeof eventNames];
@@ -112,6 +113,12 @@ export class PubSubAdapter {
 
   eventCreated(payload: string) {
     return this.publish(eventNames.EVENT_CREATED, payload);
+  }
+
+  ///////////////////////////////////////////////////
+
+  attachmentUpdated(payload: string) {
+    return this.publish(eventNames.ATTACHMENT_UPDATE, payload);
   }
 
   ///////////////////////////////////////////////////

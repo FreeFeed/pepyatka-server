@@ -33,6 +33,7 @@ import { serializeUsersByIds } from './serializers/v2/user';
 import { serializeEvents } from './serializers/v2/event';
 import { API_VERSION_ACTUAL, API_VERSION_MINIMAL } from './api-versions';
 import { connect as redisConnection } from './setup/database';
+import { serializeAttachment } from './serializers/v2/attachment';
 /** @typedef {import('./support/types').UUID} UUID */
 
 const sentryIsEnabled = 'sentryDsn' in config;
@@ -238,6 +239,8 @@ export default class PubsubListener {
       [eventNames.GROUP_TIMES_UPDATED]: this.onGroupTimesUpdate,
 
       [eventNames.EVENT_CREATED]: this.onEventCreated,
+
+      [eventNames.ATTACHMENT_UPDATE]: this.onAttachmentUpdate,
     };
 
     try {
@@ -617,6 +620,36 @@ export default class PubsubListener {
     );
   };
 
+  onAttachmentUpdate = async (attId) => {
+    const att = await dbAdapter.getAttachmentById(attId);
+
+    const payload = {
+      attachments: [serializeAttachment(att)],
+    };
+    await this.broadcastMessage(
+      [
+        `user:${att.userId}`, // for the user who owns the attachment
+        `attachment:${att.id}`, // for whomever listens specifically to this attachment
+      ],
+      eventNames.ATTACHMENT_UPDATE,
+      payload,
+      {
+        emitter: async (socket, type, json) => {
+          const { userId } = socket;
+          const { realtimeChannels } = json;
+
+          if (userId !== att.userId && !realtimeChannels.includes(`attachment:${attId}`)) {
+            // Other users can only listen to `attachment:${userId}`
+            return;
+          }
+
+          const users = await serializeUsersByIds([att.userId], userId);
+          await socket.emit(type, { ...json, users });
+        },
+      },
+    );
+  };
+
   onCommentLikeNew = async (data) => {
     await this._sendCommentLikeMsg(data, eventNames.COMMENT_LIKE_ADDED);
   };
@@ -766,8 +799,6 @@ export default class PubsubListener {
    */
   _singleUserEmitter = (userId, emitter = defaultEmitter) =>
     this._onlyUsersEmitter(List.from([userId]), emitter);
-  // (socket, type, json) =>
-  //   socket.userId === userId && defaultEmitter(socket, type, json);
 
   _withUserIdEmitter = (socket, type, json) =>
     socket.userId && defaultEmitter(socket, type, { ...json, id: socket.userId });

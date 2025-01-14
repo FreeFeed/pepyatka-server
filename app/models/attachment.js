@@ -14,6 +14,7 @@ import { sanitizeMediaMetadata, SANITIZE_NONE, SANITIZE_VERSION } from '../suppo
 import { processMediaFile } from '../support/media-files/process';
 import { currentConfig } from '../support/app-async-context';
 import { createPrepareVideoJob } from '../jobs/attachment-prepare-video';
+import { PubSub as pubSub } from '../models';
 
 const mvAsync = util.promisify(mv);
 
@@ -206,6 +207,13 @@ export function addModel(dbAdapter) {
           duration: null,
         };
         await dbAdapter.updateAttachment(this.id, toUpdate);
+      }
+
+      // Realtime events
+      await pubSub.attachmentUpdated(this.id);
+
+      if (this.postId) {
+        await pubSub.updatePost(this.postId);
       }
     }
 

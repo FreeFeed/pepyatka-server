@@ -170,6 +170,7 @@ export class Post {
   isVisibleFor(viewer: Nullable<User>): Promise<boolean>;
   getCommentsListeners(): Promise<UUID[]>;
   getUserSpecificProps(user: User): Promise<PostUserState>;
+  linkAttachments(attachments: UUID[]): Promise<void>;
 }
 
 export class Timeline {
