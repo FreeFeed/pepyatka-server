@@ -66,6 +66,24 @@ describe('Attachments', () => {
       },
       users: [{ id: luna.user.id }],
     });
+
+    // Test the v4 API response
+    const resp1 = await performJSONRequest('GET', `/v4/attachments/${id}`);
+    expect(resp1, 'to satisfy', {
+      attachments: {
+        id,
+        mediaType: 'general',
+        fileName: 'test.txt',
+        fileSize: 'this is a test'.length,
+        previewTypes: expect.it('to equal', []),
+        createdAt: attObj.createdAt.toISOString(),
+        updatedAt: attObj.updatedAt.toISOString(),
+        createdBy: luna.user.id,
+        postId: null,
+      },
+
+      users: [{ id: luna.user.id }],
+    });
   });
 
   it(`should create small image attachment`, async () => {
@@ -89,6 +107,22 @@ describe('Attachments', () => {
         postId: null,
       },
       users: [{ id: luna.user.id }],
+    });
+
+    // Test the v4 API response
+    const resp1 = await performJSONRequest('GET', `/v4/attachments/${id}`);
+    expect(resp1.attachments, 'to equal', {
+      id,
+      mediaType: 'image',
+      fileName: 'test-image.150x150.png',
+      fileSize: fs.statSync(filePath).size,
+      previewTypes: ['image'],
+      width: 150,
+      height: 150,
+      createdAt: attObj.createdAt.toISOString(),
+      updatedAt: attObj.updatedAt.toISOString(),
+      createdBy: luna.user.id,
+      postId: null,
     });
   });
 
@@ -116,6 +150,22 @@ describe('Attachments', () => {
         postId: null,
       },
       users: [{ id: luna.user.id }],
+    });
+
+    // Test the v4 API response
+    const resp1 = await performJSONRequest('GET', `/v4/attachments/${id}`);
+    expect(resp1.attachments, 'to equal', {
+      id,
+      mediaType: 'image',
+      fileName: 'test-image.900x300.png',
+      fileSize: fs.statSync(filePath).size,
+      previewTypes: ['image'],
+      width: 900,
+      height: 300,
+      createdAt: attObj.createdAt.toISOString(),
+      updatedAt: attObj.updatedAt.toISOString(),
+      createdBy: luna.user.id,
+      postId: null,
     });
   });
 
@@ -145,6 +195,24 @@ describe('Attachments', () => {
       },
       users: [{ id: luna.user.id }],
     });
+
+    // Test the v4 API response
+    const resp1 = await performJSONRequest('GET', `/v4/attachments/${id}`);
+    expect(resp1.attachments, 'to equal', {
+      id,
+      mediaType: 'image',
+      fileName: 'test-image.3000x2000.png',
+      fileSize: fs.statSync(filePath).size,
+      previewTypes: ['image'],
+      width: 3000,
+      height: 2000,
+      previewWidth: 2449,
+      previewHeight: 1633,
+      createdAt: attObj.createdAt.toISOString(),
+      updatedAt: attObj.updatedAt.toISOString(),
+      createdBy: luna.user.id,
+      postId: null,
+    });
   });
 
   it(`should create mp3 audio attachment`, async () => {
@@ -170,6 +238,25 @@ describe('Attachments', () => {
         title: 'Improvisation with Sopranino Recorder',
       },
       users: [{ id: luna.user.id }],
+    });
+
+    // Test the v4 API response
+    const resp1 = await performJSONRequest('GET', `/v4/attachments/${id}`);
+    expect(resp1.attachments, 'to equal', {
+      id,
+      mediaType: 'audio',
+      fileName: 'music.mp3',
+      fileSize: fs.statSync(filePath).size,
+      previewTypes: ['audio'],
+      meta: {
+        'dc:title': 'Improvisation with Sopranino Recorder',
+        'dc:creator': 'Piermic',
+      },
+      duration: 24.032653,
+      createdAt: attObj.createdAt.toISOString(),
+      updatedAt: attObj.updatedAt.toISOString(),
+      createdBy: luna.user.id,
+      postId: null,
     });
   });
 
@@ -199,6 +286,27 @@ describe('Attachments', () => {
       },
       users: [{ id: luna.user.id }],
     });
+
+    // Test the v4 API response
+    const resp1 = await performJSONRequest('GET', `/v4/attachments/${id}`);
+    expect(resp1.attachments, 'to equal', {
+      id,
+      mediaType: 'video',
+      fileName: 'test-image-animated.gif',
+      fileSize: fs.statSync(filePath).size,
+      previewTypes: ['image', 'video'],
+      meta: {
+        animatedImage: true,
+        silent: true,
+      },
+      width: 774,
+      height: 392,
+      duration: 2.4,
+      createdAt: attObj.createdAt.toISOString(),
+      updatedAt: attObj.updatedAt.toISOString(),
+      createdBy: luna.user.id,
+      postId: null,
+    });
   });
 
   it(`should create attachment from video file`, async () => {
@@ -227,6 +335,23 @@ describe('Attachments', () => {
       users: [{ id: luna.user.id }],
     });
 
+    // Test the v4 API response
+    {
+      const resp1 = await performJSONRequest('GET', `/v4/attachments/${id}`);
+      expect(resp1.attachments, 'to equal', {
+        id,
+        mediaType: 'video',
+        fileName: 'polyphon.mp4',
+        fileSize: 29,
+        previewTypes: [],
+        meta: { inProgress: true },
+        createdAt: attObj.createdAt.toISOString(),
+        updatedAt: attObj.updatedAt.toISOString(),
+        createdBy: luna.user.id,
+        postId: null,
+      });
+    }
+
     // Now execute the job
     await jobManager.fetchAndProcess();
 
@@ -245,6 +370,26 @@ describe('Attachments', () => {
       createdBy: luna.user.id,
       postId: null,
     });
+
+    // Test the v4 API response
+    {
+      const maxFile = attObj.getLocalFilePath('');
+      const resp1 = await performJSONRequest('GET', `/v4/attachments/${id}`);
+      expect(resp1.attachments, 'to equal', {
+        id,
+        mediaType: 'video',
+        fileName: 'polyphon.mp4',
+        fileSize: fs.statSync(maxFile).size,
+        previewTypes: ['image', 'video'],
+        duration: 5.005,
+        width: 1280,
+        height: 720,
+        createdAt: attObj.createdAt.toISOString(),
+        updatedAt: attObj.updatedAt.toISOString(),
+        createdBy: luna.user.id,
+        postId: null,
+      });
+    }
   });
 
   it(`should create attachment from any binary form field`, async () => {
@@ -300,6 +445,26 @@ describe('Attachments', () => {
         users: [{ id: mars.user.id }],
         hasMore: true,
       });
+
+      // Test the v4 API response
+      {
+        const resp1 = await performJSONRequest(
+          'GET',
+          '/v4/attachments/my?limit=4',
+          null,
+          authHeaders(mars),
+        );
+        expect(resp1, 'to satisfy', {
+          attachments: [
+            { fileName: 'test10.txt', previewTypes: [] },
+            { fileName: 'test9.txt', previewTypes: [] },
+            { fileName: 'test8.txt', previewTypes: [] },
+            { fileName: 'test7.txt', previewTypes: [] },
+          ],
+          users: [{ id: mars.user.id }],
+          hasMore: true,
+        });
+      }
     });
 
     it(`should list the rest of Mars'es attachments`, async () => {
@@ -547,17 +712,17 @@ describe('Attachments', () => {
       ]);
 
       expect(events, 'to satisfy', [
-        { attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }] },
+        { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
         {
           posts: { id: post.id },
           attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
         },
-        { attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }] },
+        { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
         {
           posts: { id: post.id },
           attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
         },
-        { attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }] },
+        { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
       ]);
     });
   });

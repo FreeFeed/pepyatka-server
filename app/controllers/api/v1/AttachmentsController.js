@@ -2,7 +2,12 @@ import createDebug from 'debug';
 import compose from 'koa-compose';
 import { isInt } from 'validator';
 
-import { reportError, BadRequestException, ValidationException } from '../../../support/exceptions';
+import {
+  reportError,
+  BadRequestException,
+  ValidationException,
+  NotFoundException,
+} from '../../../support/exceptions';
 import { serializeAttachment } from '../../../serializers/v2/attachment';
 import { serializeUsersByIds } from '../../../serializers/v2/user';
 import { authRequired } from '../../middlewares';
@@ -23,7 +28,7 @@ export default class AttachmentsController {
     async (ctx) => {
       // Accept one file-type field with any name
       const [file] = Object.values(ctx.request.files || []);
-      const { user } = ctx.state;
+      const { user, apiVersion } = ctx.state;
 
       if (!file) {
         throw new BadRequestException('No file provided');
@@ -33,7 +38,7 @@ export default class AttachmentsController {
         const newAttachment = await Attachment.create(file.filepath, file.originalFilename, user);
 
         ctx.body = {
-          attachments: serializeAttachment(newAttachment),
+          attachments: serializeAttachment(newAttachment, apiVersion),
           users: await serializeUsersByIds([newAttachment.userId], user.id),
         };
       } catch (e) {
@@ -61,7 +66,7 @@ export default class AttachmentsController {
   my = compose([
     authRequired(),
     async (ctx) => {
-      const { user } = ctx.state;
+      const { user, apiVersion } = ctx.state;
       const { limit: qLimit, page: qPage } = ctx.request.query;
 
       const DEFAULT_LIMIT = 30;
@@ -103,7 +108,7 @@ export default class AttachmentsController {
       }
 
       ctx.body = {
-        attachments: attachments.map(serializeAttachment),
+        attachments: attachments.map((a) => serializeAttachment(a, apiVersion)),
         users: await serializeUsersByIds([user.id], user.id),
         hasMore,
       };
@@ -135,4 +140,23 @@ export default class AttachmentsController {
       };
     },
   ]);
+
+  async getById(ctx) {
+    const { attId } = ctx.params;
+    const { user, apiVersion } = ctx.state;
+
+    const attachment = await dbAdapter.getAttachmentById(attId);
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    const serAttachment = serializeAttachment(attachment, apiVersion);
+    const users = await serializeUsersByIds([attachment.userId], user?.id);
+
+    ctx.body = {
+      attachments: serAttachment,
+      users,
+    };
+  }
 }

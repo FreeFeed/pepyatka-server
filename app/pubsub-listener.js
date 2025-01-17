@@ -622,17 +622,13 @@ export default class PubsubListener {
 
   onAttachmentUpdate = async (attId) => {
     const att = await dbAdapter.getAttachmentById(attId);
-
-    const payload = {
-      attachments: [serializeAttachment(att)],
-    };
     await this.broadcastMessage(
       [
         `user:${att.userId}`, // for the user who owns the attachment
         `attachment:${att.id}`, // for whomever listens specifically to this attachment
       ],
       eventNames.ATTACHMENT_UPDATE,
-      payload,
+      {},
       {
         emitter: async (socket, type, json) => {
           const { userId } = socket;
@@ -643,8 +639,9 @@ export default class PubsubListener {
             return;
           }
 
+          const attachments = serializeAttachment(att, socket.apiVersion);
           const users = await serializeUsersByIds([att.userId], userId);
-          await socket.emit(type, { ...json, users });
+          await socket.emit(type, { ...json, attachments, users });
         },
       },
     );

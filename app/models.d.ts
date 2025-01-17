@@ -7,7 +7,7 @@ import { GONE_NAMES } from './models/user';
 import { ISO8601DateTimeString, ISO8601DurationString, Nullable, UUID } from './support/types';
 import { SessionTokenV1Store } from './models/auth-tokens';
 import { List } from './support/open-lists';
-import { MediaMetaData, MediaPreviews } from './support/media-files/types';
+import { MediaMetaData, MediaPreviews, MediaType } from './support/media-files/types';
 
 export const postgres: Knex;
 export const dbAdapter: DbAdapter;
@@ -195,15 +195,21 @@ type AttachmentParams = {
 };
 export class Attachment {
   id: UUID;
+  mediaType: MediaType;
   fileName: string;
   fileExtension: string;
   fileSize: number;
   sanitized: number;
-  previews: MediaPreviews;
+  readonly previews: MediaPreviews;
   meta: MediaMetaData;
   width: number | null;
   height: number | null;
   duration: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: UUID;
+  postId: UUID | null;
+
   constructor(params: AttachmentParams);
   static create(
     filePath: string,
