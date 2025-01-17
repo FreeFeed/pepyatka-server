@@ -212,7 +212,6 @@ declare module 'config' {
     videoPreviewShortSides: {
       [k: string]: number;
     };
-    nonVisualPreviewTypes: string[];
   };
 
   export type MediaStorage =

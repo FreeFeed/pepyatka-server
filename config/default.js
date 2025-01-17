@@ -186,9 +186,6 @@ config.attachments = {
       v2: 720,
       v3: 1080,
     },
-    nonVisualPreviewTypes: [
-      'a1', // Audio preview
-    ],
   },
 };
 config.profilePictures = {

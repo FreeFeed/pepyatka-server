@@ -53,24 +53,6 @@ const checkIfMediaDirectoriesExist = async () => {
     log(`Attachments dir does not exist: ${attachmentsDir}`);
   }
 
-  const requiredSubdirs = [
-    ...Object.keys(attConf.previews.imagePreviewAreas),
-    ...Object.keys(attConf.previews.legacyImagePreviewSizes),
-    ...attConf.previews.nonVisualPreviewTypes,
-  ];
-
-  const checkPromises = Object.values(requiredSubdirs).map(async (subdir) => {
-    const thumbnailsDir = attachmentsDir + subdir;
-
-    try {
-      await access(thumbnailsDir, constants.W_OK);
-    } catch {
-      gotErrors = true;
-      log(`Thumbnails dir does not exist: ${thumbnailsDir}`);
-    }
-  });
-  await Promise.all(checkPromises);
-
   if (gotErrors) {
     throw new Error(`some of required directories are missing`);
   }
