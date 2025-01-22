@@ -124,6 +124,47 @@ export function getVideoPreviewSizes(
   return result;
 }
 
+/**
+ * Find the best variant that can fill (as CSS' 'cover') the given target size.
+ * Returns the variant ID and the its updated size. The variant image never
+ * upscales, if there is no suitable variant, the maximum variant is returned,
+ * cropped to match the target aspect ratio.
+ */
+export function getBestVariant(
+  variants: { [variant: string]: { w: number; h: number } },
+  targetWidth: number,
+  targetHeight: number,
+): {
+  variant: string;
+  width: number;
+  height: number;
+} {
+  const entries = Object.entries(variants).sort((a, b) => a[1].w - b[1].w); // Sort by ascending size
+  const bestEntry =
+    entries.find(([, { w, h }]) => w >= targetWidth && h >= targetHeight) ??
+    entries[entries.length - 1]; // Or the last entry as the biggest one
+
+  const [variant, { w, h }] = bestEntry;
+
+  if (w >= targetWidth && h >= targetHeight) {
+    return {
+      variant,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  }
+
+  // No suitable variant, crop to the target aspect ratio
+  const cropped = fitIntoBox({ width: targetWidth, height: targetHeight }, { width: w, height: h });
+
+  return {
+    variant,
+    ...cropped,
+  };
+}
+
+// Internals
+
 function fitIntoArea({ width, height }: Box, area: number): Box {
   if (width * height > area) {
     const ratio = Math.sqrt(area / (width * height));

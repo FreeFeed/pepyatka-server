@@ -2,6 +2,7 @@
 import expect from 'unexpected';
 
 import {
+  getBestVariant,
   getImagePreviewSizes,
   getVideoPreviewSizes,
 } from '../../../../app/support/media-files/geometry';
@@ -101,4 +102,46 @@ describe('Geometry of videos', () => {
       { variant: 'v1', width: 640, height: 480 },
     ]);
   });
+});
+
+describe('getBestVariant', () => {
+  const variants = {
+    x1: { w: 100, h: 200 },
+    x2: { w: 200, h: 400 },
+    x3: { w: 300, h: 600 },
+  };
+
+  const testData = [
+    {
+      width: 100,
+      height: 200,
+      result: { variant: 'x1', width: 100, height: 200 },
+    },
+    {
+      width: 120,
+      height: 200,
+      result: { variant: 'x2', width: 120, height: 200 },
+    },
+    {
+      width: 100,
+      height: 400,
+      result: { variant: 'x2', width: 100, height: 400 },
+    },
+    {
+      width: 1000,
+      height: 1000,
+      result: { variant: 'x3', width: 300, height: 300 }, // Don't upscale
+    },
+    {
+      width: 400,
+      height: 400,
+      result: { variant: 'x3', width: 300, height: 300 }, // Don't upscale
+    },
+  ] as const;
+
+  for (const { width, height, result } of testData) {
+    it(`should return ${JSON.stringify(result.variant)} for ${width}x${height}`, () => {
+      expect(getBestVariant(variants, width, height), 'to equal', result);
+    });
+  }
 });

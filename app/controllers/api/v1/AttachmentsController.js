@@ -1,6 +1,8 @@
 import createDebug from 'debug';
 import compose from 'koa-compose';
 import { isInt } from 'validator';
+import { lookup } from 'mime-types';
+import { mediaType } from '@hapi/accept';
 
 import {
   reportError,
@@ -13,6 +15,8 @@ import { serializeUsersByIds } from '../../../serializers/v2/user';
 import { authRequired } from '../../middlewares';
 import { dbAdapter, Attachment } from '../../../models';
 import { startAttachmentsSanitizeJob } from '../../../jobs/attachments-sanitize';
+import { currentConfig } from '../../../support/app-async-context';
+import { getBestVariant } from '../../../support/media-files/geometry';
 
 export default class AttachmentsController {
   app;
@@ -158,5 +162,121 @@ export default class AttachmentsController {
       attachments: serAttachment,
       users,
     };
+  }
+
+  /**
+   * @param {import('koa').Context} ctx
+   */
+  async getPreview(ctx) {
+    const { attId, type } = ctx.params;
+    const { query } = ctx.request;
+    const { useImgProxy } = currentConfig().attachments;
+    const imageFormats = ['jpeg', 'webp', 'avif'];
+    const formatExtensions = {
+      jpeg: 'jpg',
+      webp: 'webp',
+      avif: 'avif',
+    };
+
+    if (!['original', 'image', 'video', 'audio'].includes(type)) {
+      throw new NotFoundException('Invalid preview type');
+    }
+
+    if ('format' in query && !imageFormats.includes(query.format)) {
+      throw new ValidationException('Invalid format value');
+    }
+
+    const width = 'width' in query ? Number.parseInt(query.width, 10) : undefined;
+    const height = 'height' in query ? Number.parseInt(query.height, 10) : undefined;
+
+    if (
+      (width && (!Number.isFinite(width) || width <= 0)) ||
+      (height && (!Number.isFinite(height) || height <= 0))
+    ) {
+      throw new ValidationException('Invalid width/height values');
+    }
+
+    const asRedirect = 'redirect' in query;
+
+    const attachment = await dbAdapter.getAttachmentById(attId);
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    if (type !== 'original' && !(type in attachment.previews)) {
+      throw new NotFoundException('Preview of specified type not found');
+    }
+
+    const response = {};
+
+    if (type === 'original') {
+      response.url = attachment.getFileUrl('');
+      response.mimeType = attachment.mimeType;
+
+      if (attachment.width && attachment.height) {
+        response.width = attachment.width;
+        response.height = attachment.height;
+      }
+    } else if (type === 'audio') {
+      // We always have one audio preview
+      const [[variant, { ext }]] = Object.entries(attachment.previews.audio);
+      response.url = attachment.getFileUrl(variant);
+      response.mimeType = lookup(ext) || 'application/octet-stream';
+    } else {
+      // Visual types, 'image' and 'video'
+
+      const previews = attachment.previews[type];
+      const {
+        variant,
+        width: resWidth,
+        height: resHeight,
+      } = getBestVariant(previews, width, height);
+      const prv = previews[variant];
+
+      response.url = attachment.getFileUrl(variant);
+      response.mimeType = lookup(prv.ext) || 'application/octet-stream';
+      response.width = prv.w;
+      response.height = prv.h;
+
+      // With imgproxy, we can resize images and change their format
+      if (type === 'image' && useImgProxy) {
+        let { format } = query;
+
+        if (!format) {
+          const acceptedTypes = imageFormats.map((f) => `image/${f}`);
+          format = mediaType(ctx.headers.accept ?? 'image/jpeg', acceptedTypes);
+
+          if (acceptedTypes.includes(format)) {
+            format = format.replace('image/', '');
+          } else {
+            format = 'jpeg';
+          }
+        }
+
+        const fileUrl = new URL(response.url);
+
+        if (prv.ext !== formatExtensions[format]) {
+          fileUrl.searchParams.set('format', format);
+          response.mimeType = `image/${format}`;
+        }
+
+        if (resWidth !== prv.w || resHeight !== prv.h) {
+          fileUrl.searchParams.set('width', width.toString());
+          fileUrl.searchParams.set('height', height.toString());
+          response.width = resWidth;
+          response.height = resHeight;
+        }
+
+        response.url = fileUrl.toString();
+      }
+    }
+
+    if (asRedirect) {
+      ctx.redirect(response.url);
+      ctx.body = `Redirecting to ${response.url}`;
+    } else {
+      ctx.body = response;
+    }
   }
 }

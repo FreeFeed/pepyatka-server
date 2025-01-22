@@ -199,6 +199,7 @@ export class Attachment {
   fileName: string;
   fileExtension: string;
   fileSize: number;
+  mimeType: string;
   sanitized: number;
   readonly previews: MediaPreviews;
   meta: MediaMetaData;

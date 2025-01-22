@@ -107,6 +107,7 @@ export const appTokensScopes = [
       'GET /vN/calendar/:username/:year/:month',
       'GET /vN/calendar/:username/:year/:month/:day',
       'GET /vN/attachments/:attId',
+      'GET /vN/attachments/:attId/:type',
     ],
   },
   {

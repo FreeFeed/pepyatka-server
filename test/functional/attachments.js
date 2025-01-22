@@ -13,6 +13,7 @@ import { dbAdapter, PubSub } from '../../app/models';
 import { initJobProcessing } from '../../app/jobs';
 import { eventNames, PubSubAdapter } from '../../app/support/PubSubAdapter';
 import { getSingleton } from '../../app/app';
+import { withModifiedConfig } from '../helpers/with-modified-config';
 
 import {
   createTestUser,
@@ -20,6 +21,7 @@ import {
   performJSONRequest,
   authHeaders,
   justCreatePost,
+  performRequest,
 } from './functional_test_helper';
 import Session from './realtime-session';
 
@@ -724,6 +726,273 @@ describe('Attachments', () => {
         },
         { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
       ]);
+    });
+  });
+
+  describe('Preview endpoint', () => {
+    /** @type {Attachment} */
+    let att;
+
+    it('should return a error for invalid ID', async () => {
+      const resp = await performJSONRequest(
+        'GET',
+        `/v4/attachments/00000000-00000000-00000000-00000000/original`,
+      );
+      expect(resp, 'to satisfy', {
+        err: 'Attachment not found',
+        __httpCode: 404,
+      });
+    });
+
+    describe("'general' type and common errors", () => {
+      before(async () => {
+        const data = new FormData();
+        data.append('file', new Blob(['this is a test'], { type: 'text/plain' }), 'test.txt');
+        const resp = await performJSONRequest('POST', '/v4/attachments', data, authHeaders(luna));
+        const { id } = resp.attachments;
+        att = await dbAdapter.getAttachmentById(id);
+      });
+
+      it('should return a link to the original', async () => {
+        const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/original`);
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl(''),
+          mimeType: 'text/plain',
+        });
+      });
+
+      it('should return redirect to the original', async () => {
+        /** @type {Response} */
+        const resp = await performRequest(`/v4/attachments/${att.id}/original?redirect`, {
+          redirect: 'manual',
+        });
+        expect(resp.status, 'to be', 302);
+        expect(resp.headers.get('Location'), 'to be', att.getFileUrl(''));
+      });
+
+      for (const type of ['image', 'video', 'audio']) {
+        it(`should return a error for '${type}' preview type`, async () => {
+          const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/${type}`);
+          expect(resp, 'to satisfy', {
+            err: 'Preview of specified type not found',
+            __httpCode: 404,
+          });
+        });
+      }
+
+      it(`should return a error for 'incorrect' preview type`, async () => {
+        const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/incorrect`);
+        expect(resp, 'to satisfy', {
+          err: 'Invalid preview type',
+          __httpCode: 404,
+        });
+      });
+    });
+
+    describe("'image' type", () => {
+      before(async () => {
+        const filePath = path.join(__dirname, '../fixtures/test-image.900x300.png');
+        const data = new FormData();
+        data.append('file', await fileFrom(filePath, 'image/png'));
+        const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+        const { id } = resp.attachments;
+        att = await dbAdapter.getAttachmentById(id);
+      });
+
+      it('should return a link to the original', async () => {
+        const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/original`);
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl(''),
+          mimeType: 'image/png',
+          width: 900,
+          height: 300,
+        });
+      });
+
+      for (const type of ['video', 'audio']) {
+        it(`should return a error for '${type}' preview type`, async () => {
+          const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/${type}`);
+          expect(resp, 'to satisfy', {
+            err: 'Preview of specified type not found',
+            __httpCode: 404,
+          });
+        });
+      }
+
+      it(`should return the original as a largest 'image' preview`, async () => {
+        const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/image`);
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl(''),
+          mimeType: 'image/png',
+          width: 900,
+          height: 300,
+        });
+      });
+
+      it(`should return a small 'image' preview`, async () => {
+        const resp = await performJSONRequest(
+          'GET',
+          `/v4/attachments/${att.id}/image?width=100&height=100`,
+        );
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl('thumbnails'),
+          mimeType: 'image/webp',
+          width: 525,
+          height: 175,
+        });
+      });
+
+      it(`should return 'image' preview that is bigger than the original`, async () => {
+        const resp = await performJSONRequest(
+          'GET',
+          `/v4/attachments/${att.id}/image?width=1000&height=1000`,
+        );
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl(''),
+          mimeType: 'image/png',
+          width: 900,
+          height: 300,
+        });
+      });
+
+      describe(`when the imgproxy is turned on`, () => {
+        withModifiedConfig({ attachments: { useImgProxy: true } });
+
+        it(`should return a small 'image' preview`, async () => {
+          const resp = await performJSONRequest(
+            'GET',
+            `/v4/attachments/${att.id}/image?width=100&height=100`,
+          );
+          expect(resp, 'to satisfy', {
+            url: `${att.getFileUrl('thumbnails')}?format=jpeg&width=100&height=100`,
+            mimeType: 'image/jpeg',
+            width: 100,
+            height: 100,
+          });
+        });
+
+        it(`should return a small 'image' preview in reply to the request with Accept header`, async () => {
+          const resp = await performJSONRequest(
+            'GET',
+            `/v4/attachments/${att.id}/image?width=100&height=100`,
+            null,
+            { Accept: 'image/avif,image/webp' },
+          );
+          expect(resp, 'to satisfy', {
+            url: `${att.getFileUrl('thumbnails')}?format=avif&width=100&height=100`,
+            mimeType: 'image/avif',
+            width: 100,
+            height: 100,
+          });
+        });
+
+        it(`should return a small 'image' preview with requested AVIF format`, async () => {
+          const resp = await performJSONRequest(
+            'GET',
+            `/v4/attachments/${att.id}/image?width=100&height=100&format=avif`,
+          );
+          expect(resp, 'to satisfy', {
+            url: `${att.getFileUrl('thumbnails')}?format=avif&width=100&height=100`,
+            mimeType: 'image/avif',
+            width: 100,
+            height: 100,
+          });
+        });
+      });
+    });
+
+    describe("'audio' type", () => {
+      before(async () => {
+        const filePath = path.join(__dirname, '../fixtures/media-files/music.mp3');
+        const data = new FormData();
+        data.append('file', await fileFrom(filePath, 'audio/mpeg'));
+        const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+        const { id } = resp.attachments;
+        att = await dbAdapter.getAttachmentById(id);
+      });
+
+      it('should return a link to the original', async () => {
+        const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/original`);
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl(''),
+          mimeType: 'audio/mpeg',
+        });
+      });
+
+      for (const type of ['video', 'image']) {
+        it(`should return a error for '${type}' preview type`, async () => {
+          const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/${type}`);
+          expect(resp, 'to satisfy', {
+            err: 'Preview of specified type not found',
+            __httpCode: 404,
+          });
+        });
+      }
+
+      it('should return the original as an audio preview', async () => {
+        const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/audio`);
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl(''),
+          mimeType: 'audio/mpeg',
+        });
+      });
+    });
+
+    describe("'video' type", () => {
+      before(async () => {
+        const filePath = path.join(__dirname, '../fixtures/test-image-animated.gif');
+        const data = new FormData();
+        data.append('file', await fileFrom(filePath, 'image/gif'));
+        const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
+        const { id } = resp.attachments;
+        att = await dbAdapter.getAttachmentById(id);
+      });
+
+      it('should return a link to the original', async () => {
+        const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/original`);
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl(''),
+          mimeType: 'image/gif',
+          width: 774,
+          height: 392,
+        });
+      });
+
+      for (const type of ['audio']) {
+        it(`should return a error for '${type}' preview type`, async () => {
+          const resp = await performJSONRequest('GET', `/v4/attachments/${att.id}/${type}`);
+          expect(resp, 'to satisfy', {
+            err: 'Preview of specified type not found',
+            __httpCode: 404,
+          });
+        });
+      }
+
+      it(`should return a small 'image' preview`, async () => {
+        const resp = await performJSONRequest(
+          'GET',
+          `/v4/attachments/${att.id}/image?width=100&height=100`,
+        );
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl('thumbnails'),
+          mimeType: 'image/webp',
+          width: 346,
+          height: 175,
+        });
+      });
+
+      it(`should return a small 'video' preview`, async () => {
+        const resp = await performJSONRequest(
+          'GET',
+          `/v4/attachments/${att.id}/video?width=100&height=100`,
+        );
+        expect(resp, 'to satisfy', {
+          url: att.getFileUrl('v1'),
+          mimeType: 'video/mp4',
+          width: 774,
+          height: 392,
+        });
+      });
     });
   });
 });

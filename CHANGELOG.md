@@ -49,6 +49,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [app/serializers/v2/attachment.ts](app/serializers/v2/attachment.ts) file.
 - The new `GET /vN/attachments/:attId` API endpoint returns the attachment by
   its ID.
+- The new `GET /vN/attachments/:attId/:type` API endpoint returns the preview or
+  the original of the attachment. The _type_ parameter can be 'original',
+  'image', 'video' or 'audio'. The returned data is a JSON object with the following
+  fields:
+  - _url_ - the URL of the preview/original file
+  - _mimeType_ - the MIME type of the preview/original file
+  - _width_ and _height_ (optional) - the size in pixels if the file is visual
+  
+  This endpoint accepts the following query parameters (all optional):
+  - _width_ and _height_ - the desired 'image'/'video' preview size in pixels
+  - _format_ - the desired 'image' preview format: 'jpeg', 'webp', 'avif'
+  - _redirect_ - if present, the response will be a 302 redirect to the file
+  
+  The server will choose the best available preview to fill the given size. It
+  is not guaranteed that the returned preview will be of the requested size and
+  format, but it will be as close as possible.
 - Allow to limit the number of simultaneous executions for some job types.
 
   The JobManager now has a `limitedJobs` parameter of type `Record<string,
