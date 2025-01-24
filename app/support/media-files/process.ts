@@ -4,6 +4,8 @@ import { lookup as mimeLookup } from 'mime-types';
 import { exiftool } from 'exiftool-vendored';
 
 import { spawnAsync, SpawnAsyncArgs } from '../spawn-async';
+import { currentConfig } from '../app-async-context';
+import { ContentTooLargeException } from '../exceptions';
 
 import { detectMediaType } from './detect';
 import {
@@ -48,6 +50,18 @@ export async function processMediaFile(
     height: undefined as number | undefined,
     duration: undefined as number | undefined,
   };
+
+  // Check the file size, if it is too big, throw an error
+  {
+    const limits = currentConfig().attachments.fileSizeLimitByType;
+    const sizeLimit = limits[info.type] ?? limits['default'];
+
+    if (commonResult.fileSize > sizeLimit) {
+      throw new ContentTooLargeException(
+        `This '${info.type}' file is too large (the maximum size is ${sizeLimit} bytes)`,
+      );
+    }
+  }
 
   if (info.type === 'image' || info.type === 'video') {
     commonResult.width = info.width;

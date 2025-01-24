@@ -159,7 +159,12 @@ config.attachments = {
   url: defer((cfg) => cfg.media.url),
   storage: defer((cfg) => cfg.media.storage),
   path: 'attachments/', // must have trailing slash
-  fileSizeLimit: 10 * 1000 * 1000,
+  fileSizeLimitByType: {
+    // Limits for each file type
+    video: 500 * 1024 * 1024,
+    default: 50 * 1024 * 1024, // Must exist
+  },
+  fileSizeLimit: defer((cfg) => Math.max(...Object.values(cfg.attachments.fileSizeLimitByType))),
   maxCount: 20,
   sanitizeMetadata: {
     // Media tags to remove via exiftool (using in Attachment.sanitizeMetadata)

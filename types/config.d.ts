@@ -28,6 +28,13 @@ declare module 'config' {
       storage: MediaStorage;
       path: string;
       fileSizeLimit: number;
+      fileSizeLimitByType: {
+        image?: number;
+        video?: number;
+        audio?: number;
+        general?: number;
+        default: number;
+      };
       maxCount: number;
       sanitizeMetadata: {
         removeTags: RegExp[];
