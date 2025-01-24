@@ -4,7 +4,6 @@ import { Readable } from 'stream';
 
 import { fromPairs } from 'lodash';
 import expect from 'unexpected';
-import { parse as bytesParse } from 'bytes';
 import config from 'config';
 
 import cleanDB from '../dbCleaner';
@@ -21,7 +20,8 @@ import {
 import { postResponse } from './schemaV2-helper';
 import Session from './realtime-session';
 
-const fileSizeLimit = bytesParse(config.attachments.fileSizeLimit);
+const sizeLimits = config.attachments.fileSizeLimitByType;
+const imageSizeLimit = sizeLimits['image'] ?? sizeLimits['default'];
 
 describe('BookmarkletController', () => {
   let rtPort;
@@ -122,11 +122,11 @@ describe('BookmarkletController', () => {
           ctx.status = 200;
           ctx.response.type = 'image/jpeg';
           ctx.body = 'sss';
-          ctx.response.length = fileSizeLimit * 2;
+          ctx.response.length = imageSizeLimit * 2;
         } else if (url === '/big-body.jpg') {
           ctx.status = 200;
           ctx.response.type = 'image/jpeg';
-          ctx.body = getStreamOfLength(fileSizeLimit * 2);
+          ctx.body = getStreamOfLength(imageSizeLimit * 2);
         } else if (url === '/im%C3%A5ge.png') {
           ctx.status = 200;
           ctx.response.type = 'image/png';
