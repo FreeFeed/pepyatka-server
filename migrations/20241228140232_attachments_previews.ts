@@ -7,6 +7,8 @@ export const up = (knex: Knex) =>
     alter table attachments add column width integer;
     alter table attachments add column height integer;
     alter table attachments add column duration float;
+
+    create index idx_attachments_meta on attachments using gin (meta jsonb_path_ops);
 end$$`);
 
 export const down = (knex: Knex) =>

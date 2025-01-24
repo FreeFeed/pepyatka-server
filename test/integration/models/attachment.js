@@ -721,6 +721,23 @@ describe('Attachments', () => {
       expect(att.meta, 'to equal', { animatedImage: true, silent: true });
     });
   });
+
+  describe('Async processing limits', () => {
+    withModifiedConfig({ attachments: { userMediaProcessingLimit: 2 } });
+
+    it(`should not process more than 2 attachments at once`, async () => {
+      await expect(createAttachment(testFiles.mov, post, user), 'to be fulfilled');
+      await expect(createAttachment(testFiles.mov, post, user), 'to be fulfilled');
+      await expect(
+        createAttachment(testFiles.mov, post, user),
+        'to be rejected with error satisfying',
+        { status: 429 },
+      );
+
+      await jobManager.fetchAndProcess();
+      await expect(createAttachment(testFiles.mov, post, user), 'to be fulfilled');
+    });
+  });
 });
 
 async function uploadFile(fileObject) {

@@ -35,6 +35,7 @@ declare module 'config' {
         general?: number;
         default: number;
       };
+      userMediaProcessingLimit: number;
       maxCount: number;
       sanitizeMetadata: {
         removeTags: RegExp[];

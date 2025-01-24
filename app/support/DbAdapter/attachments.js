@@ -148,6 +148,13 @@ const attachmentsTrait = (superClass) =>
           .reduce((sum, row) => sum + row.count, 0),
       };
     }
+
+    async getInProgressAttachmentsNumber(userId) {
+      return await this.database.getOne(
+        `select count(*)::int from attachments where user_id = :userId and meta @> '{ "inProgress": true }'`,
+        { userId },
+      );
+    }
   };
 
 export default attachmentsTrait;

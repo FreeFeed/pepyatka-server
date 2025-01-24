@@ -15,6 +15,7 @@ import { processMediaFile } from '../support/media-files/process';
 import { currentConfig } from '../support/app-async-context';
 import { createPrepareVideoJob } from '../jobs/attachment-prepare-video';
 import { PubSub as pubSub } from '../models';
+import { TooManyRequestsException } from '../support/exceptions';
 
 const mvAsync = util.promisify(mv);
 
@@ -128,6 +129,21 @@ export function addModel(dbAdapter) {
       }
 
       const { files = {}, ...mediaData } = await processMediaFile(filePath, fileName);
+
+      if (mediaData.meta?.inProgress) {
+        // How many of user's media are currently being processed?
+        const limit = currentConfig().attachments.userMediaProcessingLimit;
+        const inProgressMedia = await dbAdapter.getInProgressAttachmentsNumber(user.id);
+
+        if (inProgressMedia >= limit) {
+          // User has too many media in progress, don't process any more
+          await Promise.all(Object.values(files).map((file) => fs.unlink(file.path)));
+
+          throw new TooManyRequestsException(
+            `You cannot process more than ${limit} media files at the same time. Please try again later.`,
+          );
+        }
+      }
 
       // Save record to DB
       const params = {

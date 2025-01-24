@@ -165,6 +165,8 @@ config.attachments = {
     default: 50 * 1024 * 1024, // Must exist
   },
   fileSizeLimit: defer((cfg) => Math.max(...Object.values(cfg.attachments.fileSizeLimitByType))),
+  // Number of user media files in the processing queue
+  userMediaProcessingLimit: 5,
   maxCount: 20,
   sanitizeMetadata: {
     // Media tags to remove via exiftool (using in Attachment.sanitizeMetadata)
