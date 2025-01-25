@@ -137,6 +137,11 @@ describe('getBestVariant', () => {
       height: 400,
       result: { variant: 'x3', width: 300, height: 300 }, // Don't upscale
     },
+    {
+      width: undefined,
+      height: undefined,
+      result: { variant: 'x3', width: 300, height: 600 }, // Max variant
+    },
   ] as const;
 
   for (const { width, height, result } of testData) {

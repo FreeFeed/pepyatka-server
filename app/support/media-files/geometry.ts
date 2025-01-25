@@ -132,14 +132,25 @@ export function getVideoPreviewSizes(
  */
 export function getBestVariant(
   variants: { [variant: string]: { w: number; h: number } },
-  targetWidth: number,
-  targetHeight: number,
+  targetWidth?: number,
+  targetHeight?: number,
 ): {
   variant: string;
   width: number;
   height: number;
 } {
   const entries = Object.entries(variants).sort((a, b) => a[1].w - b[1].w); // Sort by ascending size
+
+  // If no dimensions are required, use the maximum available variant
+  if (!targetWidth || !targetHeight) {
+    const bestEntry = entries[entries.length - 1];
+    return {
+      variant: bestEntry[0],
+      width: bestEntry[1].w,
+      height: bestEntry[1].h,
+    };
+  }
+
   const bestEntry =
     entries.find(([, { w, h }]) => w >= targetWidth && h >= targetHeight) ??
     entries[entries.length - 1]; // Or the last entry as the biggest one
