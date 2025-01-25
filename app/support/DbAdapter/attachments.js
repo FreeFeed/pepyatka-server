@@ -148,6 +148,13 @@ const attachmentsTrait = (superClass) =>
           .reduce((sum, row) => sum + row.count, 0),
       };
     }
+
+    async getInProgressAttachmentsNumber(userId) {
+      return await this.database.getOne(
+        `select count(*)::int from attachments where user_id = :userId and meta @> '{ "inProgress": true }'`,
+        { userId },
+      );
+    }
   };
 
 export default attachmentsTrait;
@@ -182,49 +189,42 @@ const ATTACHMENT_COLUMNS = {
   mimeType: 'mime_type',
   mediaType: 'media_type',
   fileExtension: 'file_extension',
-  noThumbnail: 'no_thumbnail',
   imageSizes: 'image_sizes',
   artist: 'artist',
   title: 'title',
   userId: 'user_id',
   postId: 'post_id',
   sanitized: 'sanitized',
+  previews: 'previews',
+  meta: 'meta',
+  width: 'width',
+  height: 'height',
+  duration: 'duration',
 };
 
 const ATTACHMENT_COLUMNS_MAPPING = {
+  /**
+   * @param {Date|null|'now'} timestamp
+   * @returns {string|null}
+   */
   createdAt: (timestamp) => {
-    const d = new Date();
-    d.setTime(timestamp);
-    return d.toISOString();
+    return timestamp instanceof Date ? timestamp.toISOString() : timestamp;
   },
+  /**
+   * @param {Date|null|'now'} timestamp
+   * @returns {string|null}
+   */
   updatedAt: (timestamp) => {
-    if (timestamp === 'now') {
-      return timestamp;
-    }
-
-    const d = new Date();
-    d.setTime(timestamp);
-    return d.toISOString();
+    return timestamp instanceof Date ? timestamp.toISOString() : timestamp;
   },
-  noThumbnail: (no_thumbnail) => {
-    return no_thumbnail === '1';
+  imageSizes: (image_sizes) => {
+    return image_sizes ? JSON.stringify(image_sizes) : null;
   },
-  fileSize: (file_size) => {
-    return parseInt(file_size, 10);
+  previews: (previews) => {
+    return previews ? JSON.stringify(previews) : null;
   },
-  postId: (post_id) => {
-    if (validator.isUUID(post_id)) {
-      return post_id;
-    }
-
-    return null;
-  },
-  userId: (user_id) => {
-    if (validator.isUUID(user_id)) {
-      return user_id;
-    }
-
-    return null;
+  meta: (meta) => {
+    return meta ? JSON.stringify(meta) : null;
   },
 };
 
@@ -237,32 +237,27 @@ export const ATTACHMENT_FIELDS = {
   mime_type: 'mimeType',
   media_type: 'mediaType',
   file_extension: 'fileExtension',
-  no_thumbnail: 'noThumbnail',
   image_sizes: 'imageSizes',
   artist: 'artist',
   title: 'title',
   user_id: 'userId',
   post_id: 'postId',
   sanitized: 'sanitized',
+  previews: 'previews',
+  meta: 'meta',
+  width: 'width',
+  height: 'height',
+  duration: 'duration',
 };
 
 const ATTACHMENT_FIELDS_MAPPING = {
-  created_at: (time) => {
-    return time.getTime().toString();
-  },
-  updated_at: (time) => {
-    return time.getTime().toString();
-  },
   no_thumbnail: (no_thumbnail) => {
     return no_thumbnail ? '1' : '0';
   },
   file_size: (file_size) => {
-    return file_size && file_size.toString();
+    return file_size && parseInt(file_size);
   },
-  post_id: (post_id) => {
-    return post_id ? post_id : '';
-  },
-  user_id: (user_id) => {
-    return user_id ? user_id : '';
+  image_sizes: (image_sizes) => {
+    return image_sizes ? JSON.parse(image_sizes) : '';
   },
 };

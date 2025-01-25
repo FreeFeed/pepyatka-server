@@ -118,7 +118,7 @@ describe('TimelinesAsRSS', () => {
       expect(item.children, 'to have an item satisfying', {
         name: 'enclosure',
         attributes: {
-          url: `${config.host}/attachments/${att1.id}`,
+          url: `${config.host}/attachments/${att1.id}.jpg`,
           length: `${att1.fileSize}`,
           type: 'image/jpeg',
         },
@@ -126,7 +126,7 @@ describe('TimelinesAsRSS', () => {
       expect(item.children, 'to have an item satisfying', {
         name: 'enclosure',
         attributes: {
-          url: `${config.host}/attachments/${att2.id}`,
+          url: `${config.host}/attachments/${att2.id}.jpg`,
           length: `${att2.fileSize}`,
           type: 'image/jpeg',
         },
@@ -146,9 +146,11 @@ describe('TimelinesAsRSS', () => {
           `</div>`,
           `<p class="freefeed-images">` +
             // Strange src and href here because of incomplete attach implementation in createMockAttachmentAsync
-            `<a href="${config.host}/attachments/${att1.id}"><img src="" width="${att1.imageSizes.t.w}" height="${att1.imageSizes.t.h}"></a>` +
+            `<a href="${config.host}/attachments/${att1.id}.jpg">` +
+            `<img src="${config.host}/attachments/thumbnails/${att1.id}.jpg" width="${att1.imageSizes.t.w}" height="${att1.imageSizes.t.h}"></a>` +
             ` ` +
-            `<a href="${config.host}/attachments/${att2.id}"><img src="" width="${att2.imageSizes.t.w}" height="${att2.imageSizes.t.h}"></a>` +
+            `<a href="${config.host}/attachments/${att2.id}.jpg">` +
+            `<img src="${config.host}/attachments/thumbnails/${att2.id}.jpg" width="${att2.imageSizes.t.w}" height="${att2.imageSizes.t.h}"></a>` +
             `</p>`,
         ].join('\n'),
       );

@@ -224,12 +224,14 @@ export class DbAdapter {
   // Attachments
   getAttachmentById(id: UUID): Promise<Attachment | null>;
   getPostAttachments(id: UUID): Promise<UUID[]>;
+  getAttachmentsOfPost(postId: UUID): Promise<Attachment[]>;
   listAttachments(options: ListAttachmentsOptions): Promise<Attachment[]>;
   createAttachmentsSanitizeTask(userId: UUID): Promise<AttachmentsSanitizeTask>;
   getAttachmentsSanitizeTask(userId: UUID): Promise<Nullable<AttachmentsSanitizeTask>>;
   deleteAttachmentsSanitizeTask(userId: UUID): Promise<void>;
   getNonSanitizedAttachments(userId: UUID, limit: number): Promise<Attachment[]>;
   getAttachmentsStats(userId: UUID): Promise<AttachmentsStats>;
+  getInProgressAttachmentsNumber(userId: UUID): Promise<number>;
 
   // Timelines
   getTimelinesByIds(ids: UUID[]): Promise<Timeline[]>;
@@ -338,7 +340,7 @@ export class DbAdapter {
   updateJob(id: UUID, params: { unlockAt?: Date | number; failure?: boolean | null }): Promise<Job>;
   getJobById(id: UUID): Promise<Nullable<Job>>;
   deleteJob(id: UUID): Promise<void>;
-  fetchJobs(count: number, lockTime: number): Promise<Job[]>;
+  fetchJobs(count: number, lockTime: number, limitedJobs?: Record<string, number>): Promise<Job[]>;
   getAllJobs(names?: string[]): Promise<Job[]>; // For testing purposes only
 
   // Group blocks

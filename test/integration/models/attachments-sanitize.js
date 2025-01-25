@@ -12,6 +12,7 @@ import S3rver from 's3rver';
 import { User } from '../../../app/models';
 import cleanDB from '../../dbCleaner';
 import { SANITIZE_NONE, SANITIZE_VERSION } from '../../../app/support/sanitize-media';
+import { withModifiedConfig } from '../../helpers/with-modified-config';
 
 import { createAttachment } from './attachment-helpers';
 
@@ -39,7 +40,7 @@ describe('Sanitize media metadata on create', () => {
       content: await fsPromises.readFile(photoWithGPSPath),
     });
 
-    const newTags = await exiftool.read(att.getPath());
+    const newTags = await exiftool.read(att.getLocalFilePath(''));
     expect(newTags, 'to not have keys', gpsTags);
     expect(att.sanitized, 'to be', SANITIZE_VERSION);
   });
@@ -54,7 +55,7 @@ describe('Sanitize media metadata on create', () => {
       content,
     });
 
-    const newContent = await fsPromises.readFile(att.getPath());
+    const newContent = await fsPromises.readFile(att.getLocalFilePath(''));
     const newHash = fileHash(newContent);
     expect(newHash, 'to equal', oldHash);
     expect(att.sanitized, 'to be', SANITIZE_VERSION);
@@ -74,7 +75,7 @@ describe('Sanitize media metadata on create', () => {
         content,
       });
 
-      const newContent = await fsPromises.readFile(att.getPath());
+      const newContent = await fsPromises.readFile(att.getLocalFilePath(''));
       const newHash = fileHash(newContent);
       expect(newHash, 'to equal', oldHash);
       expect(att.sanitized, 'to be', SANITIZE_NONE);
@@ -105,7 +106,7 @@ describe('sanitizeOriginal model method', () => {
       expect(prevSize, 'not to equal', att.fileSize);
       expect(att.sanitized, 'to be', SANITIZE_VERSION);
 
-      const newTags = await exiftool.read(att.getPath());
+      const newTags = await exiftool.read(att.getLocalFilePath(''));
       expect(newTags, 'to not have keys', gpsTags);
     });
 
@@ -134,6 +135,12 @@ describe('sanitizeOriginal model method', () => {
       endpoint: 'http://localhost:4569',
       s3ConfigOptions: { forcePathStyle: true },
     };
+
+    withModifiedConfig({
+      media: { storage: storageConfig },
+      attachments: { storage: storageConfig },
+    });
+
     before(async () => {
       s3instance = new S3rver({
         port: 4569,

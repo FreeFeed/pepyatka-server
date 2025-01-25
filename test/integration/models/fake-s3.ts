@@ -1,11 +1,7 @@
 import { ReadStream } from 'fs';
 
-type S3Shape = {
-  putObject(params: S3UploadParams): Promise<void>;
-  deleteObject(params: S3DeleteParams): Promise<void>;
-};
-
 type S3UploadParams = {
+  Key: string;
   Body: ReadStream;
 };
 
@@ -16,31 +12,32 @@ type S3DeleteParams = {
 
 type S3UploadCbParams = Omit<S3UploadParams, 'Body'> & { Body: Buffer };
 
-export function fakeS3({
-  onUpload,
-  onDelete,
-}: {
-  onUpload: (params: S3UploadCbParams) => void;
-  onDelete: (params: S3DeleteParams) => void;
-}): S3Shape {
-  return {
-    putObject(params: S3UploadParams) {
-      return new Promise((resolve) => {
-        const chunks = [] as Buffer[];
-        params.Body.on('data', function (chunk) {
-          chunks.push(chunk as Buffer);
-        });
+export type FakeS3Storage = Map<string, S3UploadCbParams>;
 
-        params.Body.on('end', function () {
-          const Body = Buffer.concat(chunks);
-          onUpload({ ...params, Body });
-          resolve();
-        });
+export const fakeS3Storage: FakeS3Storage = new Map();
+
+export class FakeS3 {
+  public readonly storage: FakeS3Storage;
+
+  constructor(storage: FakeS3Storage = fakeS3Storage) {
+    this.storage = storage;
+  }
+
+  putObject(params: S3UploadParams): Promise<void> {
+    return new Promise((resolve) => {
+      const chunks: Uint8Array[] = [];
+      params.Body.on('data', (chunk) => chunks.push(chunk as Uint8Array));
+
+      params.Body.on('end', () => {
+        const Body = Buffer.concat(chunks);
+        this.storage.set(params.Key, { ...params, Body });
+        resolve();
       });
-    },
-    deleteObject(params: S3DeleteParams) {
-      onDelete(params);
-      return Promise.resolve();
-    },
-  };
+    });
+  }
+
+  deleteObject(params: S3DeleteParams): Promise<void> {
+    this.storage.delete(params.Key);
+    return Promise.resolve();
+  }
 }

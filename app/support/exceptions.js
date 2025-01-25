@@ -78,6 +78,14 @@ export class TooManyRequestsException extends Error {
   }
 }
 
+export class ContentTooLargeException extends Error {
+  constructor(message = 'Content Too Large') {
+    super(message);
+    Error.captureStackTrace(this, this.constructor);
+    this.status = 413;
+  }
+}
+
 export class ServerErrorException {
   constructor(message) {
     this.message = message || 'Internal server error';

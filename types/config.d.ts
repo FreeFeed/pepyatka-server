@@ -18,30 +18,31 @@ declare module 'config' {
     proxyIpHeader: string;
     logResponseTime: boolean;
     adminEmail: string;
-    media: { supportedExtensions: string[] };
+    media: {
+      url: string;
+      storage: MediaStorage;
+      supportedExtensions: string[];
+    };
     attachments: {
       url: string;
+      storage: MediaStorage;
       path: string;
       fileSizeLimit: number;
-      maxCount: number;
-      imageSizes: Record<
-        string,
-        {
-          path: string;
-          bounds: {
-            width: number;
-            height: number;
-          };
-        }
-      >;
-      storage: {
-        rootDir: string;
+      fileSizeLimitByType: {
+        image?: number;
+        video?: number;
+        audio?: number;
+        general?: number;
+        default: number;
       };
+      userMediaProcessingLimit: number;
+      maxCount: number;
       sanitizeMetadata: {
         removeTags: RegExp[];
         ignoreTags: RegExp[];
       };
       useImgProxy: boolean;
+      previews: PreviewsConfiguration;
     };
     maintenance: {
       messageFile: string;
@@ -207,6 +208,33 @@ declare module 'config' {
     totalCharactersPerMonth: number;
     userCharactersPerDay: number;
   };
+
+  export type PreviewsConfiguration = {
+    imagePreviewAreas: { [k: string]: number };
+    legacyImagePreviewSizes: {
+      [k: string]: {
+        width: number;
+        height: number;
+      };
+    };
+    videoPreviewShortSides: {
+      [k: string]: number;
+    };
+  };
+
+  export type MediaStorage =
+    | {
+        type: 'fs';
+        rootDir: string;
+      }
+    | {
+        type: 's3';
+        accessKeyId: string;
+        secretAccessKey: string;
+        bucket: string;
+        region: string;
+        s3ConfigOptions: Record<string, unknown>;
+      };
 
   const c: Config;
   export default c;

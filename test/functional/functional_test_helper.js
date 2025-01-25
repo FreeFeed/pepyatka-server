@@ -744,12 +744,13 @@ export async function createMockAttachmentAsync(context) {
   const params = {
     mediaType: 'image',
     fileName: 'lion.jpg',
+    fileExtension: 'jpg',
     fileSize: 12345,
     userId: context.user.id,
-    postId: '',
-    createdAt: new Date().getTime(),
-    updatedAt: new Date().getTime(),
-    imageSizes: { t: { w: 200, h: 175, url: '' }, o: { w: 600, h: 525, url: '' } },
+    imageSizes: {
+      t: { w: 200, h: 175, url: 'https://example.com/t/lion.jpg' },
+      o: { w: 600, h: 525, url: 'https://example.com/lion.jpg' },
+    },
   };
 
   const id = await dbAdapter.createAttachment(params);
