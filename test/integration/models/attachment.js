@@ -527,7 +527,7 @@ describe('Attachments', () => {
       expect(att, 'to satisfy', {
         mediaType: 'video',
         fileName: 'polyphon.mp4',
-        fileExtension: 'in-progress',
+        fileExtension: 'tmp',
         mimeType: 'text/plain',
         fileSize: 29,
         previews: expect.it('to equal', {}),
@@ -588,7 +588,7 @@ describe('Attachments', () => {
       expect(att, 'to satisfy', {
         mediaType: 'video',
         fileName: 'polyphon.ogv',
-        fileExtension: 'in-progress',
+        fileExtension: 'tmp',
         mimeType: 'text/plain',
         fileSize: 29,
         previews: expect.it('to equal', {}),
@@ -649,7 +649,7 @@ describe('Attachments', () => {
       expect(att, 'to satisfy', {
         mediaType: 'video',
         fileName: 'test-quicktime-video.mov',
-        fileExtension: 'in-progress',
+        fileExtension: 'tmp',
         mimeType: 'text/plain',
         fileSize: 29,
         previews: expect.it('to equal', {}),

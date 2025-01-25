@@ -112,7 +112,7 @@ export async function processMediaFile(
     if (!info.isAnimatedImage && !synchronous) {
       // Truly video, should create processing task
       const stubContent = 'This file is being processed.';
-      const stubFilePath = tmpFileVariant(localFilePath, '', 'in-progress');
+      const stubFilePath = tmpFileVariant(localFilePath, '', 'tmp');
       await writeFile(stubFilePath, stubContent);
 
       meta.inProgress = true;
@@ -120,7 +120,7 @@ export async function processMediaFile(
       return {
         mediaType: 'video',
         ...commonResult,
-        ...(await fileProps(stubFilePath, origFileName, 'in-progress')),
+        ...(await fileProps(stubFilePath, origFileName, 'tmp')),
         mimeType: 'text/plain',
         duration: undefined,
         width: undefined,
@@ -128,7 +128,7 @@ export async function processMediaFile(
         previews: {},
         meta,
         files: {
-          '': { path: stubFilePath, ext: 'in-progress' },
+          '': { path: stubFilePath, ext: 'tmp' },
           original: { path: localFilePath, ext: info.extension },
         },
       };

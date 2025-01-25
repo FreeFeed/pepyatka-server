@@ -18,6 +18,7 @@ type SerializedAttachmentV2 = {
   postId: UUID | null;
   artist?: string;
   title?: string;
+  inProgress?: true;
 };
 
 type SerializedAttachmentV4 = {
@@ -114,6 +115,10 @@ function serializeAttachmentV2(att: Attachment): SerializedAttachmentV2 {
       // Show it as 'general'
       result.mediaType = 'general';
     }
+  }
+
+  if (att.meta.inProgress) {
+    result.inProgress = true;
   }
 
   return result;
