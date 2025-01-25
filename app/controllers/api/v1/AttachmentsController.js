@@ -262,8 +262,8 @@ export default class AttachmentsController {
         }
 
         if (resWidth !== prv.w || resHeight !== prv.h) {
-          fileUrl.searchParams.set('width', width.toString());
-          fileUrl.searchParams.set('height', height.toString());
+          fileUrl.searchParams.set('width', resWidth.toString());
+          fileUrl.searchParams.set('height', resHeight.toString());
           response.width = resWidth;
           response.height = resHeight;
         }
