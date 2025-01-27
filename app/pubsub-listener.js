@@ -240,7 +240,8 @@ export default class PubsubListener {
 
       [eventNames.EVENT_CREATED]: this.onEventCreated,
 
-      [eventNames.ATTACHMENT_UPDATE]: this.onAttachmentUpdate,
+      [eventNames.ATTACHMENT_CREATED]: this.onAttachmentNew,
+      [eventNames.ATTACHMENT_UPDATED]: this.onAttachmentUpdate,
     };
 
     try {
@@ -620,6 +621,29 @@ export default class PubsubListener {
     );
   };
 
+  onAttachmentNew = async (attId) => {
+    const att = await dbAdapter.getAttachmentById(attId);
+    await this.broadcastMessage(
+      [`user:${att.userId}`],
+      eventNames.ATTACHMENT_CREATED,
+      {},
+      {
+        emitter: async (socket, type, json) => {
+          const { userId } = socket;
+
+          if (userId !== att.userId) {
+            // Other attachment's owner can hear this event
+            return;
+          }
+
+          const attachments = serializeAttachment(att, socket.apiVersion);
+          const users = await serializeUsersByIds([att.userId], userId);
+          await socket.emit(type, { ...json, attachments, users });
+        },
+      },
+    );
+  };
+
   onAttachmentUpdate = async (attId) => {
     const att = await dbAdapter.getAttachmentById(attId);
     await this.broadcastMessage(
@@ -627,7 +651,7 @@ export default class PubsubListener {
         `user:${att.userId}`, // for the user who owns the attachment
         `attachment:${att.id}`, // for whomever listens specifically to this attachment
       ],
-      eventNames.ATTACHMENT_UPDATE,
+      eventNames.ATTACHMENT_UPDATED,
       {},
       {
         emitter: async (socket, type, json) => {

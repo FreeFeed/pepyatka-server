@@ -640,13 +640,10 @@ export function addModel(dbAdapter) {
     async linkAttachments(attachmentList) {
       const attachmentIds = attachmentList || this.attachments || [];
       const attachments = await dbAdapter.getAttachmentsByIds(attachmentIds);
+      const validAttachments = attachments.filter((a) => a.fileSize !== undefined);
 
-      const attachmentPromises = attachments
-        .filter((attachment) => {
-          // Filter out invalid attachments
-          return attachment.fileSize !== undefined;
-        })
-        .map((attachment, ord) => {
+      await Promise.all(
+        validAttachments.map(async (attachment, ord) => {
           if (this.attachments) {
             const pos = this.attachments.indexOf(attachment.id);
 
@@ -658,25 +655,27 @@ export function addModel(dbAdapter) {
           }
 
           // Update connections in DB
-
-          return dbAdapter.linkAttachmentToPost(attachment.id, this.id, ord);
-        });
-
-      await Promise.all(attachmentPromises);
+          await dbAdapter.linkAttachmentToPost(attachment.id, this.id, ord);
+          // Send realtime messages
+          await pubSub.attachmentUpdated(attachment.id);
+        }),
+      );
     }
 
     async unlinkAttachments(attachmentList) {
       const attachmentIds = attachmentList || [];
       const attachments = await dbAdapter.getAttachmentsByIds(attachmentIds);
 
-      const attachmentPromises = attachments.map((attachment) => {
-        // should we modify `this.attachments` here?
+      await Promise.all(
+        attachments.map(async (attachment) => {
+          // should we modify `this.attachments` here?
 
-        // Update connections in DB
-        return dbAdapter.unlinkAttachmentFromPost(attachment.id, this.id);
-      });
-
-      await Promise.all(attachmentPromises);
+          // Update connections in DB
+          await dbAdapter.unlinkAttachmentFromPost(attachment.id, this.id);
+          // Send realtime messages
+          await pubSub.attachmentUpdated(attachment.id);
+        }),
+      );
     }
 
     async getAttachmentIds() {

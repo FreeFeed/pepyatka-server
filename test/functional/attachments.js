@@ -650,6 +650,15 @@ describe('Attachments', () => {
     /** @type {Session} */
     let anonSubscribedToAttachment;
 
+    const clearCollected = () =>
+      [
+        lunaSubscribedToHerChannel,
+        lunaSubscribedToPost,
+        lunaSubscribedToAttachment,
+        anonSubscribedToPost,
+        anonSubscribedToAttachment,
+      ].forEach((s) => (s.collected.length = 0));
+
     beforeEach(async () => {
       const app = await getSingleton();
       const port = process.env.PEPYATKA_SERVER_PORT || app.context.config.port;
@@ -677,6 +686,10 @@ describe('Attachments', () => {
     );
 
     it(`should send realtime events to the listener's channels`, async () => {
+      await Promise.all([
+        lunaSubscribedToHerChannel.sendAsync('subscribe', { user: [luna.user.id] }),
+      ]);
+
       // Create an attachment
       const filePath = path.join(__dirname, '../fixtures/media-files/polyphon.mp4');
       const data = new FormData();
@@ -684,49 +697,72 @@ describe('Attachments', () => {
       const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(luna));
       const { id: attId } = resp.attachments;
 
-      const post = await justCreatePost(luna, `Luna post`);
-      await post.linkAttachments([attId]);
-
       await Promise.all([
-        lunaSubscribedToHerChannel.sendAsync('subscribe', { user: [luna.user.id] }),
-        lunaSubscribedToPost.sendAsync('subscribe', { post: [post.id] }),
         lunaSubscribedToAttachment.sendAsync('subscribe', { attachment: [attId] }),
-        anonSubscribedToPost.sendAsync('subscribe', { post: [post.id] }),
         anonSubscribedToAttachment.sendAsync('subscribe', { attachment: [attId] }),
       ]);
 
+      {
+        const events = await Promise.all([
+          lunaSubscribedToHerChannel.haveCollected(eventNames.ATTACHMENT_CREATED),
+        ]);
+
+        expect(events, 'to satisfy', [
+          { attachments: { id: attId, url: expect.it('to end with', '.tmp') } },
+        ]);
+        clearCollected();
+      }
+
+      const post = await justCreatePost(luna, `Luna post`);
+      await post.linkAttachments([attId]);
+
+      {
+        const events = await Promise.all([
+          lunaSubscribedToHerChannel.haveCollected(eventNames.ATTACHMENT_UPDATED),
+          lunaSubscribedToAttachment.haveCollected(eventNames.ATTACHMENT_UPDATED),
+          anonSubscribedToAttachment.haveCollected(eventNames.ATTACHMENT_UPDATED),
+        ]);
+
+        expect(events, 'to satisfy', [
+          { attachments: { id: attId, url: expect.it('to end with', '.tmp') } },
+          { attachments: { id: attId, url: expect.it('to end with', '.tmp') } },
+          { attachments: { id: attId, url: expect.it('to end with', '.tmp') } },
+        ]);
+      }
+
+      await Promise.all([
+        lunaSubscribedToPost.sendAsync('subscribe', { post: [post.id] }),
+        anonSubscribedToPost.sendAsync('subscribe', { post: [post.id] }),
+      ]);
+
       // Run processing
-      [
-        lunaSubscribedToHerChannel,
-        lunaSubscribedToPost,
-        lunaSubscribedToAttachment,
-        anonSubscribedToPost,
-        anonSubscribedToAttachment,
-      ].forEach((s) => (s.collected.length = 0));
+      clearCollected();
 
       await jobManager.fetchAndProcess();
 
-      const events = await Promise.all([
-        lunaSubscribedToHerChannel.haveCollected(eventNames.ATTACHMENT_UPDATE),
-        lunaSubscribedToPost.haveCollected(eventNames.POST_UPDATED),
-        lunaSubscribedToAttachment.haveCollected(eventNames.ATTACHMENT_UPDATE),
-        anonSubscribedToPost.haveCollected(eventNames.POST_UPDATED),
-        anonSubscribedToAttachment.haveCollected(eventNames.ATTACHMENT_UPDATE),
-      ]);
+      {
+        const events = await Promise.all([
+          lunaSubscribedToHerChannel.haveCollected(eventNames.ATTACHMENT_UPDATED),
+          lunaSubscribedToPost.haveCollected(eventNames.POST_UPDATED),
+          lunaSubscribedToAttachment.haveCollected(eventNames.ATTACHMENT_UPDATED),
+          anonSubscribedToPost.haveCollected(eventNames.POST_UPDATED),
+          anonSubscribedToAttachment.haveCollected(eventNames.ATTACHMENT_UPDATED),
+        ]);
 
-      expect(events, 'to satisfy', [
-        { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
-        {
-          posts: { id: post.id },
-          attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
-        },
-        { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
-        {
-          posts: { id: post.id },
-          attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
-        },
-        { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
-      ]);
+        expect(events, 'to satisfy', [
+          { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
+          {
+            posts: { id: post.id },
+            attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
+          },
+          { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
+          {
+            posts: { id: post.id },
+            attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
+          },
+          { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
+        ]);
+      }
     });
   });
 

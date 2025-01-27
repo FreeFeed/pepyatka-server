@@ -165,6 +165,9 @@ export function addModel(dbAdapter) {
       // Upload or move files
       await object._placeFiles(files);
 
+      // Realtime events
+      await pubSub.attachmentCreated(id);
+
       monitor.increment('users.attachments');
       return object;
     }
