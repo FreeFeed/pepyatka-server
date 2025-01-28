@@ -532,9 +532,9 @@ describe('Attachments', () => {
         fileSize: 29,
         previews: expect.it('to equal', {}),
         meta: expect.it('to equal', { inProgress: true }),
-        width: null,
-        height: null,
-        duration: null,
+        width: 1280,
+        height: 720,
+        duration: 5.005,
       });
 
       // The video processing job should have been enqueued
@@ -593,9 +593,9 @@ describe('Attachments', () => {
         fileSize: 29,
         previews: expect.it('to equal', {}),
         meta: expect.it('to equal', { inProgress: true }),
-        width: null,
-        height: null,
-        duration: null,
+        width: 1280,
+        height: 720,
+        duration: 4.993,
       });
 
       // The video processing job should have been enqueued
@@ -654,9 +654,9 @@ describe('Attachments', () => {
         fileSize: 29,
         previews: expect.it('to equal', {}),
         meta: expect.it('to equal', { silent: true, inProgress: true }),
-        width: null,
-        height: null,
-        duration: null,
+        width: 1572,
+        height: 710,
+        duration: 2.9815,
       });
 
       // The video processing job should have been enqueued

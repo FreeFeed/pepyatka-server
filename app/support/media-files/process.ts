@@ -117,14 +117,16 @@ export async function processMediaFile(
 
       meta.inProgress = true;
 
+      const [maxPreviewSize] = getVideoPreviewSizes(info);
+
       return {
         mediaType: 'video',
         ...commonResult,
         ...(await fileProps(stubFilePath, origFileName, 'tmp')),
         mimeType: 'text/plain',
-        duration: undefined,
-        width: undefined,
-        height: undefined,
+        duration: info.duration,
+        width: maxPreviewSize.width,
+        height: maxPreviewSize.height,
         previews: {},
         meta,
         files: {
