@@ -390,6 +390,7 @@ async function processVideo(
         ['-preset', 'slow'],
         ['-profile:v', 'high'],
         ['-crf', '23'],
+        ['-g', '60'], // For better seeking performance
         ['-pix_fmt', 'yuv420p'],
         ...commonCommands,
         targetFile,
