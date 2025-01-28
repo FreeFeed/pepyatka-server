@@ -73,9 +73,9 @@ export async function detectMediaType(
 
       // If video has rotation, swap width and height
       if (videoStream.side_data_list) {
-        const rotation = videoStream.side_data_list.find((s) => 'rotation' in s)?.rotation ?? '0';
+        const rotation = videoStream.side_data_list.find((s) => 'rotation' in s)?.rotation ?? 0;
 
-        if (rotation === '90' || rotation === '270' || rotation === '-90' || rotation === '-270') {
+        if (rotation === 90 || rotation === 270 || rotation === -90 || rotation === -270) {
           [width, height] = [height, width];
         }
       }
