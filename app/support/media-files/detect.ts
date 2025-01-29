@@ -99,6 +99,7 @@ export async function detectMediaType(
           vCodec: videoStream.codec_name,
           aCodec: audioStream?.codec_name,
           duration: parseFloat(format.duration),
+          bitrate: parseInt(format.bit_rate),
           width,
           height,
           h264info,
@@ -146,6 +147,7 @@ async function detectAnimatedImage(
       width: videoStream.width!,
       height: videoStream.height!,
       duration: parseFloat(format.duration),
+      bitrate: parseInt(format.bit_rate),
       isAnimatedImage: true,
     };
   }

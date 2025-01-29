@@ -358,6 +358,9 @@ async function processVideo(
     stillFile,
   );
 
+  // Bitrate per pixel of the original video
+  const originalBpp = info.bitrate / (info.width * info.height);
+
   for (const { variant, width, height } of previewSizes) {
     if (variant === maxVariant) {
       if (!canUseOriginalVideo) {
@@ -384,13 +387,17 @@ async function processVideo(
         targetFile,
       );
     } else {
+      const bitrateK = Math.round((1.5 * (originalBpp * (width * height))) / 1000);
       commands.push(
         ['-map', `[${variant}out]`],
         ['-c:v', 'libx264'],
         ['-preset', 'slow'],
         ['-profile:v', 'high'],
         ['-crf', '23'],
-        ['-g', '60'], // For better seeking performance
+        // For better seeking performance
+        ['-g', '60'],
+        // Limit the maximum bitrate
+        info.isAnimatedImage ? [] : ['-maxrate', `${bitrateK}k`, '-bufsize', `${2 * bitrateK}k`],
         ['-pix_fmt', 'yuv420p'],
         ...commonCommands,
         targetFile,

@@ -33,6 +33,7 @@ export type MediaInfoVideo = {
   aCodec?: string;
   isAnimatedImage?: true;
   h264info?: H264Info;
+  bitrate: number;
 } & MediaInfoVisual &
   MediaInfoPlayable &
   MediaInfoCommon;
@@ -109,7 +110,12 @@ export type AvcStream = Stream & {
 };
 
 export type FfprobeResult = {
-  format: { format_name: string; duration: string; tags?: Record<string, string> };
+  format: {
+    format_name: string;
+    duration: string;
+    bit_rate: string;
+    tags?: Record<string, string>;
+  };
   streams: Stream[];
 };
 

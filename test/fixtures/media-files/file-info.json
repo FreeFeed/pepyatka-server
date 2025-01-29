@@ -9,7 +9,8 @@
       "height": 256,
       "duration": 7.6,
       "isAnimatedImage": true,
-      "extension": "gif"
+      "extension": "gif",
+      "bitrate": 391272
     }
   },
   {
@@ -77,6 +78,7 @@
       "width": 1280,
       "height": 720,
       "duration": 5.005,
+      "bitrate": 1711589,
       "tags": {
         "title": "Kreuz-Polka",
         "major_brand": "isom",
@@ -98,6 +100,7 @@
       "width": 1280,
       "height": 720,
       "duration": 4.993,
+      "bitrate": 2942024,
       "extension": "ogv"
     }
   },
@@ -111,6 +114,7 @@
       "width": 1280,
       "height": 720,
       "duration": 5.237,
+      "bitrate": 1472789,
       "tags": { "encoder": "Lavf58.29.100" },
       "extension": "wmv"
       
