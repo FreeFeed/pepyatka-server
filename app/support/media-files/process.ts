@@ -417,7 +417,6 @@ async function processVideo(
 
   await spawnAsync('ffmpeg', [
     '-hide_banner',
-    ['-err_detect', 'explode', '-xerror'], // Fail on error
     ['-loglevel', 'error'],
     ['-i', localFilePath],
     ['-filter_complex', filters.join(';')],
