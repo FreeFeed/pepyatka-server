@@ -53,12 +53,13 @@ export async function processMediaFile(
 
   // Check the file size, if it is too big, throw an error
   {
+    const type = info.type === 'video' && info.isAnimatedImage ? 'image' : info.type;
     const limits = currentConfig().attachments.fileSizeLimitByType;
-    const sizeLimit = limits[info.type] ?? limits['default'];
+    const sizeLimit = limits[type] ?? limits['default'];
 
     if (commonResult.fileSize > sizeLimit) {
       throw new ContentTooLargeException(
-        `This '${info.type}' file is too large (the maximum size is ${sizeLimit} bytes)`,
+        `This '${type}' file is too large (the maximum size is ${sizeLimit} bytes)`,
       );
     }
   }
