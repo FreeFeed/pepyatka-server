@@ -17,7 +17,7 @@ export async function detectMediaType(
     try {
       const out = await spawnAsync('identify', [
         ['-format', '%m %W %H %[orientation] %n|'],
-        localFilePath,
+        `${localFilePath}[0,1]`, // Select only up to 2 first frames to reduce the memory usage
       ]);
 
       // Select only the first values sequence (there could be more for animated images)
