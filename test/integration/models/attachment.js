@@ -252,6 +252,7 @@ describe('Attachments', () => {
     expect(att.meta, 'to equal', {
       'dc:title': 'Improvisation with Sopranino Recorder',
       'dc:creator': 'Piermic',
+      'dc:relation.isPartOf': 'Wikimedia',
     });
   });
 

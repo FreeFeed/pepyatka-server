@@ -38,8 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     _MediaPreviews_ type in the
     [app/support/media-files/types.ts](app/support/media-files/types.ts) file.
   - `meta`: JSON object with temporary or not essential media metadata. It can
-    contain the audio/video title and author name (in 'dc:title' and
-    'dc:creator' fields, respectively) and some special flags:
+    contain the audio/video title, album title and author name (in 'dc:title',
+    'dc:relation.isPartOf' and 'dc:creator' fields, respectively) and some
+    special flags:
     - `animatedImage`: true if the video was created from an animated image
     - `silent`: true if the video has no audio track
     - `inProgress`: true if the media file is currently being processed

@@ -253,6 +253,7 @@ describe('Attachments', () => {
       meta: {
         'dc:title': 'Improvisation with Sopranino Recorder',
         'dc:creator': 'Piermic',
+        'dc:relation.isPartOf': 'Wikimedia',
       },
       duration: 24.032653,
       createdAt: attObj.createdAt.toISOString(),

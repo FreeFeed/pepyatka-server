@@ -72,12 +72,22 @@ export async function processMediaFile(
   if (info.type === 'audio' || info.type === 'video') {
     commonResult.duration = info.duration;
 
-    if (info.tags?.title) {
-      commonResult.meta!['dc:title'] = info.tags.title;
-    }
+    if (info.tags) {
+      const title = getKeyCaseInsensitive(info.tags, 'title');
+      const artist = getKeyCaseInsensitive(info.tags, 'artist');
+      const album = getKeyCaseInsensitive(info.tags, 'album');
 
-    if (info.tags?.artist) {
-      commonResult.meta!['dc:creator'] = info.tags.artist;
+      if (title) {
+        commonResult.meta!['dc:title'] = title;
+      }
+
+      if (artist) {
+        commonResult.meta!['dc:creator'] = artist;
+      }
+
+      if (album) {
+        commonResult.meta!['dc:relation.isPartOf'] = album;
+      }
     }
   }
 
@@ -512,4 +522,13 @@ async function fileProps(filePath: string, origFileName: string, ext: string): P
     fileSize: await stat(filePath).then((s) => s.size),
     mimeType: mimeLookup(ext) || 'application/octet-stream',
   };
+}
+
+/**
+ * Get a key in a case-insensitive way
+ */
+function getKeyCaseInsensitive(obj: Record<string, string>, key: string): string | undefined {
+  key = key.toLowerCase();
+  const realKey = Object.keys(obj).find((k) => k.toLowerCase() === key);
+  return realKey ? obj[realKey] : undefined;
 }
