@@ -2,7 +2,14 @@ import { open } from 'fs/promises';
 
 import { spawnAsync } from '../spawn-async';
 
-import { AvcStream, FfprobeResult, H264Info, MediaInfo, MediaInfoVideo } from './types';
+import {
+  AvcStream,
+  FfprobeResult,
+  H264Info,
+  MediaInfo,
+  MediaInfoVideo,
+  VideoStream,
+} from './types';
 import { addFileExtension } from './file-ext';
 
 export async function detectMediaType(
@@ -64,7 +71,13 @@ export async function detectMediaType(
     const { format, streams } = await runFfprobe(localFilePath);
     const fmt = format.format_name.split(',')[0].toLowerCase();
 
-    const videoStream = streams.find((s) => s.codec_type === 'video');
+    const videoStream = streams.find(
+      (s) =>
+        s.codec_type === 'video' &&
+        // And not an album cover or other static image
+        s.disposition.attached_pic !== 1 &&
+        s.disposition.still_image !== 1,
+    ) as VideoStream | undefined;
     const audioStream = streams.find((s) => s.codec_type === 'audio');
 
     if (videoStream && format.duration) {

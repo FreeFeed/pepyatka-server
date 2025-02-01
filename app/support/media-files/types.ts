@@ -88,21 +88,30 @@ export type FilesToUpload = { [variant: string]: { path: string; ext: string } }
 export type VisualPreviews = { [variant: string]: { w: number; h: number; ext: string } };
 export type NonVisualPreviews = { [variant: string]: { ext: string } };
 
-export type Stream = { codec_name: string } & (
-  | {
-      codec_type: 'video';
-      width: number;
-      height: number;
-      nb_frames: string;
-      side_data_list?: Record<string, string | number>[];
-      is_avc?: 'true' | 'false';
-    }
-  | {
-      codec_type: 'audio';
-    }
-);
+type CommonStream = {
+  codec_name: string;
+  disposition: {
+    attached_pic: 1 | 0;
+    still_image: 1 | 0;
+  };
+};
 
-export type AvcStream = Stream & {
+export type VideoStream = CommonStream & {
+  codec_type: 'video';
+  width: number;
+  height: number;
+  nb_frames: string;
+  side_data_list?: Record<string, string | number>[];
+  is_avc?: 'true' | 'false';
+};
+
+export type AudioStream = CommonStream & {
+  codec_type: 'audio';
+};
+
+export type Stream = VideoStream | AudioStream;
+
+export type AvcStream = VideoStream & {
   is_avc: 'true';
   profile: string;
   level: number;
