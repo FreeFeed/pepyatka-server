@@ -29,12 +29,11 @@ type SerializedAttachmentV4 = {
   previewTypes: (keyof MediaPreviews)[];
   // File metadata, don't send if empty
   meta?: MediaMetaData;
-  // Original size, only send for visual types (image, video), and when the
-  // processing is done
+  // Original size, only send for visual types (image, video)
   width?: number;
   height?: number;
-  // Duration in seconds, only for playable files (video, audio), and when the
-  // processing is done
+  // Duration in seconds, only for playable files (video, audio). Can be absent
+  // for old (pre-v4) files.
   duration?: number;
   // Maximum possible preview size, only when different from the (width, height)
   previewWidth?: number;

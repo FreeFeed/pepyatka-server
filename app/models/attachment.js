@@ -36,6 +36,11 @@ export function addModel(dbAdapter) {
       this.height = params.height;
       this.duration = params.duration;
 
+      if ((this.width === null || this.height === null) && params.imageSizes?.o) {
+        this.width = params.imageSizes.o.w;
+        this.height = params.imageSizes.o.h;
+      }
+
       this._imageSizes = params.imageSizes; // pixel sizes of thumbnail(s) and original image, e.g. {t: {w: 200, h: 175}, o: {w: 600, h: 525}}
       this._previews = params.previews;
       this._meta = params.meta;
