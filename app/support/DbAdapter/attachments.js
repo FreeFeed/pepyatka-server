@@ -26,15 +26,13 @@ const attachmentsTrait = (superClass) =>
         return null;
       }
 
-      const attrs = await this.database('attachments').first().where('uid', id);
+      const attrs = await this.getCachedAttachmentData(id);
       return initAttachmentObject(attrs);
     }
 
     async getAttachmentsByIds(ids) {
-      const responses = await this.database('attachments')
-        .whereIn('uid', ids)
-        .orderByRaw(`position(uid::text in '${ids.toString()}')`);
-      return responses.map(initAttachmentObject);
+      const data = await this.getCachedAttachmentsData(ids);
+      return data.map(initAttachmentObject);
     }
 
     async listAttachments({ userId, limit, offset = 0 }) {
@@ -60,24 +58,28 @@ const attachmentsTrait = (superClass) =>
         .update(preparedPayload)
         .returning('*');
 
+      await this.dropCachedAttachmentData(attachmentId);
       return initAttachmentObject(row);
     }
 
     async deleteAttachment(id) {
       await this.database.raw(`delete from attachments where uid = ?`, id);
+      await this.dropCachedAttachmentData(id);
     }
 
-    linkAttachmentToPost(attachmentId, postId, ord = 0) {
+    async linkAttachmentToPost(attachmentId, postId, ord = 0) {
       const payload = { post_id: postId, ord };
-      return this.database('attachments').where('uid', attachmentId).update(payload);
+      await this.database('attachments').where('uid', attachmentId).update(payload);
+      await this.dropCachedAttachmentData(attachmentId);
     }
 
-    unlinkAttachmentFromPost(attachmentId, postId) {
+    async unlinkAttachmentFromPost(attachmentId, postId) {
       const payload = { post_id: null };
-      return this.database('attachments')
+      await this.database('attachments')
         .where('uid', attachmentId)
         .where('post_id', postId)
         .update(payload);
+      await this.dropCachedAttachmentData(attachmentId);
     }
 
     async getPostAttachments(postId) {
@@ -154,6 +156,64 @@ const attachmentsTrait = (superClass) =>
         `select count(*)::int from attachments where user_id = :userId and meta @> '{ "inProgress": true }'`,
         { userId },
       );
+    }
+
+    // Attachments cache
+
+    async dropCachedAttachmentData(attachmentId) {
+      await this.cache.del(cacheKey(attachmentId));
+    }
+
+    async getCachedAttachmentData(attachmentId) {
+      const key = cacheKey(attachmentId);
+      let data = await this.cache.get(key);
+
+      if (!data) {
+        data = await this.database.getRow('select * from attachments where uid = :attachmentId', {
+          attachmentId,
+        });
+
+        if (data) {
+          await this.cache.set(key, data);
+        }
+      }
+
+      return data;
+    }
+
+    async getCachedAttachmentsData(attachmentIds) {
+      if (attachmentIds.length === 0) {
+        return [];
+      }
+
+      if (this.cache.store.name === 'redis') {
+        const keys = attachmentIds.map((id) => cacheKey(id));
+        const client = await this.cache.store.getClient();
+        const data = (await client.mget(keys)).map((x) => (x ? JSON.parse(x) : null));
+
+        const missedIds = data.map((attrs, i) => (attrs ? null : attachmentIds[i])).filter(Boolean);
+
+        if (missedIds.length > 0) {
+          const missedData = await this.database('attachments').whereIn('uid', missedIds);
+          await Promise.all(missedData.map((attrs) => this.cache.set(cacheKey(attrs.uid), attrs)));
+
+          for (let i = 0; i < data.length; i++) {
+            if (data[i]) {
+              continue;
+            }
+
+            const rec = missedData.find((attrs) => attrs.uid === attachmentIds[i]);
+
+            if (rec) {
+              data[i] = rec;
+            }
+          }
+        }
+
+        return data;
+      }
+
+      return Promise.all(attachmentIds.map((id) => this.getCachedAttachmentData(id)));
     }
   };
 
@@ -260,4 +320,18 @@ const ATTACHMENT_FIELDS_MAPPING = {
   image_sizes: (image_sizes) => {
     return image_sizes ? JSON.parse(image_sizes) : '';
   },
+  // 'created_at' may come from DB as Date or from Redis as string
+  created_at: (created_at) => {
+    return typeof created_at === 'string' ? new Date(created_at) : created_at;
+  },
+  // 'updated_at' may come from DB as Date or from Redis as string
+  updated_at: (updated_at) => {
+    return typeof updated_at === 'string' ? new Date(updated_at) : updated_at;
+  },
 };
+
+const cacheVersion = 1;
+
+function cacheKey(attId) {
+  return `attachment_${cacheVersion}_${attId}`;
+}

@@ -232,6 +232,7 @@ export class DbAdapter {
   getNonSanitizedAttachments(userId: UUID, limit: number): Promise<Attachment[]>;
   getAttachmentsStats(userId: UUID): Promise<AttachmentsStats>;
   getInProgressAttachmentsNumber(userId: UUID): Promise<number>;
+  updateAttachment(attachmentId: UUID, payload: Partial<Attachment>): Promise<Attachment>;
 
   // Timelines
   getTimelinesByIds(ids: UUID[]): Promise<Timeline[]>;

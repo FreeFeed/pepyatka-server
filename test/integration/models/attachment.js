@@ -306,15 +306,14 @@ describe('Attachments', () => {
   describe("Old 'image_sizes' data in database", () => {
     it("should create a proper 'previews' field for a small attachment", async () => {
       const { id } = await createAndCheckAttachment(testFiles.small, post, user);
-      await dbAdapter.database.raw(
-        `update attachments set previews = null, width = null, height = null, image_sizes = :sizes where uid = :id`,
-        {
-          id,
-          sizes: JSON.stringify({
-            o: { w: 150, h: 150, url: `https://example.com/attachments/${id}.png` },
-          }),
+      await dbAdapter.updateAttachment(id, {
+        previews: null,
+        width: null,
+        height: null,
+        imageSizes: {
+          o: { w: 150, h: 150, url: `https://example.com/attachments/${id}.png` },
         },
-      );
+      });
       const att = await dbAdapter.getAttachmentById(id);
       expect(att, 'to satisfy', {
         previews: expect.it('to equal', { image: { '': { h: 150, w: 150, ext: 'png' } } }),
@@ -325,16 +324,15 @@ describe('Attachments', () => {
 
     it("should create a proper 'previews' field for a medium attachment", async () => {
       const { id } = await createAndCheckAttachment(testFiles.medium, post, user);
-      await dbAdapter.database.raw(
-        `update attachments set previews = null, width = null, height = null, image_sizes = :sizes where uid = :id`,
-        {
-          id,
-          sizes: JSON.stringify({
-            o: { w: 900, h: 300, url: `https://example.com/attachments/${id}.png` },
-            t: { w: 525, h: 175, url: `https://example.com/attachments/thumbnails/${id}.png` },
-          }),
+      await dbAdapter.updateAttachment(id, {
+        previews: null,
+        width: null,
+        height: null,
+        imageSizes: {
+          o: { w: 900, h: 300, url: `https://example.com/attachments/${id}.png` },
+          t: { w: 525, h: 175, url: `https://example.com/attachments/thumbnails/${id}.png` },
         },
-      );
+      });
       const att = await dbAdapter.getAttachmentById(id);
       expect(att, 'to satisfy', {
         previews: expect.it('to equal', {
@@ -350,17 +348,16 @@ describe('Attachments', () => {
 
     it("should create a proper 'previews' field for a large attachment", async () => {
       const { id } = await createAndCheckAttachment(testFiles.large, post, user);
-      await dbAdapter.database.raw(
-        `update attachments set previews = null, width = null, height = null, image_sizes = :sizes where uid = :id`,
-        {
-          id,
-          sizes: JSON.stringify({
-            o: { w: 1500, h: 1000, url: `https://example.com/attachments/${id}.png` },
-            t: { w: 263, h: 175, url: `https://example.com/attachments/thumbnails/${id}.png` },
-            t2: { w: 525, h: 350, url: `https://example.com/attachments/thumbnails2/${id}.png` },
-          }),
+      await dbAdapter.updateAttachment(id, {
+        previews: null,
+        width: null,
+        height: null,
+        imageSizes: {
+          o: { w: 1500, h: 1000, url: `https://example.com/attachments/${id}.png` },
+          t: { w: 263, h: 175, url: `https://example.com/attachments/thumbnails/${id}.png` },
+          t2: { w: 525, h: 350, url: `https://example.com/attachments/thumbnails2/${id}.png` },
         },
-      );
+      });
       const att = await dbAdapter.getAttachmentById(id);
       expect(att, 'to satisfy', {
         previews: expect.it('to equal', {
@@ -377,10 +374,7 @@ describe('Attachments', () => {
 
     it("should create a proper 'previews' field for an audio attachment", async () => {
       const { id } = await createAndCheckAttachment(testFiles.audioMp3, post, user);
-      await dbAdapter.database.raw(
-        `update attachments set previews = null, duration = null where uid = :id`,
-        { id },
-      );
+      await dbAdapter.updateAttachment(id, { previews: null, duration: null });
       const att = await dbAdapter.getAttachmentById(id);
       expect(att.previews, 'to equal', {
         audio: {
