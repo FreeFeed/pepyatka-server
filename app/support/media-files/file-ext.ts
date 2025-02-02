@@ -58,5 +58,5 @@ export function addFileExtension<T extends TypeInfo>(
 
 export function setExtension(fileName: string, ext: string): string {
   const { name } = parsePath(fileName);
-  return formatPath({ name, ext });
+  return formatPath({ name, ext: ext ? `.${ext}` : '' }); // Add dot for Node18 compatibility
 }
