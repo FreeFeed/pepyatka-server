@@ -324,7 +324,7 @@ describe('Attachments', () => {
     // At first, we should have a stub file
     expect(resp, 'to satisfy', {
       attachments: {
-        fileName: 'polyphon.mp4',
+        fileName: 'polyphon.tmp',
         mediaType: 'general',
         fileSize: '29',
         createdAt: attObj.createdAt.getTime().toString(),
@@ -345,7 +345,7 @@ describe('Attachments', () => {
       expect(resp1.attachments, 'to equal', {
         id,
         mediaType: 'video',
-        fileName: 'polyphon.mp4',
+        fileName: 'polyphon.tmp',
         fileSize: 29,
         width: 1280,
         height: 720,

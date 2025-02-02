@@ -1,4 +1,4 @@
-import { extname } from 'path';
+import { extname, format as formatPath, parse as parsePath } from 'path';
 
 import { MediaType } from './types';
 
@@ -54,4 +54,9 @@ export function addFileExtension<T extends TypeInfo>(
   }
 
   return { ...info, extension };
+}
+
+export function setExtension(fileName: string, ext: string): string {
+  const { name } = parsePath(fileName);
+  return formatPath({ name, ext });
 }

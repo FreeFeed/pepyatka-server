@@ -17,6 +17,7 @@ import { spawnAsync } from '../../../app/support/spawn-async';
 import { withModifiedConfig } from '../../helpers/with-modified-config';
 import { initJobProcessing } from '../../../app/jobs';
 import { ATTACHMENT_PREPARE_VIDEO } from '../../../app/jobs/attachment-prepare-video';
+import { setExtension } from '../../../app/support/media-files/file-ext';
 
 import { testFiles } from './attachment-data';
 import { fakeS3Storage } from './fake-s3';
@@ -444,7 +445,7 @@ describe('Attachments', () => {
 
         const att = await Attachment.create(path, fileName, user);
         expect(att, 'to satisfy', {
-          fileName,
+          fileName: 'TEST.pdf',
           fileExtension: 'pdf',
           mimeType: 'application/pdf',
         });
@@ -461,7 +462,7 @@ describe('Attachments', () => {
 
         const att = await Attachment.create(path, fileName, user);
         expect(att, 'to satisfy', {
-          fileName,
+          fileName: 'TEST.txt',
           fileExtension: 'txt',
           mimeType: 'text/plain',
         });
@@ -477,7 +478,7 @@ describe('Attachments', () => {
 
         const att = await Attachment.create(path, fileName, user);
         expect(att, 'to satisfy', {
-          fileName,
+          fileName: 'TEST.jpg',
           fileExtension: 'jpg',
           mimeType: 'image/jpeg',
         });
@@ -538,7 +539,7 @@ describe('Attachments', () => {
       // At first, we should have a stub file
       expect(att, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'polyphon.mp4',
+        fileName: 'polyphon.tmp',
         fileExtension: 'tmp',
         mimeType: 'text/plain',
         fileSize: 29,
@@ -599,7 +600,7 @@ describe('Attachments', () => {
       // At first, we should have a stub file
       expect(att, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'polyphon.ogv',
+        fileName: 'polyphon.tmp',
         fileExtension: 'tmp',
         mimeType: 'text/plain',
         fileSize: 29,
@@ -626,7 +627,7 @@ describe('Attachments', () => {
       const att2 = await dbAdapter.getAttachmentById(att.id);
       expect(att2, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'polyphon.ogv',
+        fileName: 'polyphon.mp4',
         fileExtension: 'mp4',
         mimeType: 'video/mp4',
         previews: expect.it('to equal', {
@@ -660,7 +661,7 @@ describe('Attachments', () => {
       // At first, we should have a stub file
       expect(att, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'test-quicktime-video.mov',
+        fileName: 'test-quicktime-video.tmp',
         fileExtension: 'tmp',
         mimeType: 'text/plain',
         fileSize: 29,
@@ -687,7 +688,7 @@ describe('Attachments', () => {
       const att2 = await dbAdapter.getAttachmentById(att.id);
       expect(att2, 'to satisfy', {
         mediaType: 'video',
-        fileName: 'test-quicktime-video.mov',
+        fileName: 'test-quicktime-video.mp4',
         fileExtension: 'mp4',
         mimeType: 'video/mp4',
         previews: expect.it('to equal', {
@@ -817,18 +818,19 @@ async function checkAttachmentFiles(att) {
 async function createAndCheckAttachment(fileObject, post, user) {
   const path = await uploadFile(fileObject);
   const baseName = basename(fileObject.name);
+  const ext = fileObject.extension ?? extname(fileObject.name).slice(1);
   const att = await Attachment.create(path, baseName, user, post?.id);
 
   expect(att, 'to be a', Attachment);
   expect(att.mediaType, 'to be one of', ['image', 'audio', 'video', 'general']);
-  expect(att.fileName, 'to be', baseName);
+  expect(att.fileName, 'to be', setExtension(fileObject.name, ext));
 
   if (fileObject.size >= 0) {
     expect(att.fileSize, 'to be', fileObject.size);
   }
 
   expect(att.mimeType, 'to be', fileObject.type);
-  expect(att.fileExtension, 'to be', fileObject.extension ?? extname(fileObject.name).slice(1));
+  expect(att.fileExtension, 'to be', ext);
 
   await checkAttachmentFiles(att);
 

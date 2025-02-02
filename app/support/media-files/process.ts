@@ -19,6 +19,7 @@ import {
   VisualPreviews,
 } from './types';
 import { getImagePreviewSizes, getVideoPreviewSizes } from './geometry';
+import { setExtension } from './file-ext';
 
 type FileProps = {
   fileName: string;
@@ -517,8 +518,11 @@ function canUseOriginalVideoStream(info: MediaInfoVideo, maxPreviewSize: Box): b
 
 async function fileProps(filePath: string, origFileName: string, ext: string): Promise<FileProps> {
   return {
-    fileName: origFileName, // File name is always equal to the original file name
-    fileExtension: ext, // This is the extension of the '' variant, i.e. the file in the /attachments/ root
+    // File name is equal to the original file name, but with the extension provided. It is always
+    // matches the '' variant extension.
+    fileName: setExtension(origFileName, ext),
+    // This is the extension of the '' variant, i.e. the file in the /attachments/ root
+    fileExtension: ext,
     fileSize: await stat(filePath).then((s) => s.size),
     mimeType: mimeLookup(ext) || 'application/octet-stream',
   };
