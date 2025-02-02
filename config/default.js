@@ -478,6 +478,7 @@ config.rateLimit = {
     maxRequests: {
       all: 10, // all methods
       GET: 100, // optional
+      'GET /vN/attachments/:attId/:type': 1000,
     },
   },
   authenticated: {
@@ -486,6 +487,7 @@ config.rateLimit = {
       all: 30,
       GET: 200,
       POST: 60,
+      'GET /vN/attachments/:attId/:type': 1000,
     },
   },
   maskingKeyRotationInterval: 'P7D', // ISO 8601 duration

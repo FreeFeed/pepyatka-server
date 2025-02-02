@@ -53,13 +53,7 @@ export function createRouter() {
   // unauthenticated routes
   PasswordsRoute(publicRouter);
 
-  // Fix for ctx._matchedRoute
-  // koa-router puts most generic instead of most specific route to the ctx._matchedRoute
-  // See https://github.com/ZijianHe/koa-router/issues/246
-  publicRouter.use((ctx, next) => {
-    ctx.state.matchedRoute = ctx.matched.find((layer) => layer.methods.includes(ctx.method)).path;
-    return next();
-  });
+  publicRouter.use(fixMatchedRouteMiddleware);
 
   // [at least optionally] authenticated routes
   publicRouter.use(withJWT);
@@ -100,6 +94,7 @@ export function createRouter() {
 
   {
     const adminRouter = new Router();
+    adminRouter.use(fixMatchedRouteMiddleware);
     adminRouter.use(withJWT);
     adminRouter.use(rateLimiterMiddleware);
     adminRouter.use(withAuthToken);
@@ -111,4 +106,12 @@ export function createRouter() {
   }
 
   return router;
+}
+
+// Fix for ctx._matchedRoute
+// koa-router puts most generic instead of most specific route to the ctx._matchedRoute
+// See https://github.com/ZijianHe/koa-router/issues/246
+function fixMatchedRouteMiddleware(ctx, next) {
+  ctx.state.matchedRoute = ctx.matched.find((layer) => layer.methods.includes(ctx.method)).path;
+  return next();
 }

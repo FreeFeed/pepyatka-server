@@ -9,6 +9,7 @@ import { rateLimiterMiddleware, durationToSeconds } from '../../../app/support/r
 const MAX_ANONYMOUS_REQUESTS = 3;
 const MAX_AUTHENTICATED_REQUESTS = 5;
 const MAX_AUTHENTICATED_POST_REQUESTS = MAX_AUTHENTICATED_REQUESTS - 1;
+const MAX_ROUTE_REQUESTS = 10;
 const DURATION = 'PT5S';
 const BLOCK_DURATION = 'PT5S';
 const BLOCK_MULTIPLIER = 2;
@@ -17,6 +18,7 @@ const baseContext = {
   ip: '127.0.0.1',
   state: {
     authJWTPayload: {},
+    matchedRoute: '/v1/posts',
   },
   config: {
     rateLimit: {
@@ -26,6 +28,7 @@ const baseContext = {
         duration: DURATION,
         maxRequests: {
           all: MAX_ANONYMOUS_REQUESTS,
+          'GET /vN/attachments': MAX_ROUTE_REQUESTS,
         },
       },
       authenticated: {
@@ -33,6 +36,7 @@ const baseContext = {
         maxRequests: {
           all: MAX_AUTHENTICATED_REQUESTS,
           POST: MAX_AUTHENTICATED_POST_REQUESTS,
+          'GET /vN/attachments': MAX_ROUTE_REQUESTS,
         },
       },
       blockDuration: BLOCK_DURATION,
@@ -121,6 +125,20 @@ describe('Rate limiter', () => {
     }
 
     return expect(Promise.all(requests), 'to be fulfilled');
+  });
+
+  it('should block if a specific route limit is exceeded', async () => {
+    const ctx = merge({}, baseContext, {
+      config: { rateLimit: { enabled: true } },
+      state: { matchedRoute: '/v1/attachments' },
+    });
+
+    for (let i = 0; i < MAX_ROUTE_REQUESTS; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await expect(() => rateLimiterMiddleware(ctx, next), 'to be fulfilled');
+    }
+
+    await expect(() => rateLimiterMiddleware(ctx, next), 'to be rejected with', 'Slow down');
   });
 
   it('should block for a configurable amount of time', async () => {

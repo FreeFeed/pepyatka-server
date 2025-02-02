@@ -69,6 +69,7 @@ export async function rateLimiterMiddleware(ctx: Context, next: Next) {
   const authTokenType = ctx.state.authJWTPayload?.type || 'anonymous';
   const requestId = ctx.state.id;
   const requestMethod = ctx.request.method;
+  const matchedAPIRoute = ctx.state.matchedRoute.replace(/^\/v[^/]+/, '/vN');
   const rateLimitConfig = ctx.config.rateLimit;
 
   let realClientId, maskedClientId, rateLimiterConfigByAuthType;
@@ -107,8 +108,11 @@ export async function rateLimiterMiddleware(ctx: Context, next: Next) {
 
       throw new TooManyRequestsException('Slow down');
     } else {
+      const route = `${requestMethod === 'HEAD' ? 'GET' : requestMethod} ${matchedAPIRoute}`;
+
       const { duration, maxRequests } = rateLimiterConfigByAuthType;
-      const maxRequestsForMethod = maxRequests[requestMethod] || maxRequests.all;
+      const maxRequestsForMethod =
+        maxRequests[route] ?? maxRequests[requestMethod] ?? maxRequests.all;
       const clientIdWithMethod = `${realClientId}${requestMethod}`;
 
       const limit = await rateLimiter.get({
