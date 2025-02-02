@@ -807,8 +807,9 @@ describe('Attachments', () => {
         const resp = await performRequest(`/v4/attachments/${att.id}/original?redirect`, {
           redirect: 'manual',
         });
-        expect(resp.status, 'to be', 302);
+        expect(resp.status, 'to be', 301);
         expect(resp.headers.get('Location'), 'to be', att.getFileUrl(''));
+        expect(resp.headers.get('Cache-Control'), 'to be', 'max-age=3600');
       });
 
       for (const type of ['image', 'video', 'audio']) {

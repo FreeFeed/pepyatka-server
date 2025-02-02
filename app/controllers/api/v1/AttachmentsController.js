@@ -273,6 +273,12 @@ export default class AttachmentsController {
     }
 
     if (asRedirect) {
+      if (!attachment.meta.inProgress) {
+        // If the attachment is ready, we can use permanent redirect
+        ctx.status = 301;
+        ctx.set('Cache-Control', 'max-age=3600');
+      }
+
       ctx.redirect(response.url);
       ctx.body = `Redirecting to ${response.url}`;
     } else {
