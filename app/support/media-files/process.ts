@@ -336,16 +336,19 @@ async function processVideo(
   // Components of 'filter_complex' graph
   const filters: string[] = [];
 
-  // First, we need to resize the original video to maximum preview size
+  // First, we need to ensure that the video input is in YUV420 format (it is important for some GIFs)
+  filters.push(`[0:v:0]format=yuv420p[vin]`);
+
+  // Next, we need to resize the original video to maximum preview size
   if (maxPreviewSize.width === info.width && maxPreviewSize.height === info.height) {
     // We can use original video sizes
-    filters.push(`[0:v:0]copy[max]`);
+    filters.push(`[vin]copy[max]`);
   } else if (maxPreviewSize.width + 1 === info.width || maxPreviewSize.height + 1 === info.height) {
     // Special case: the original has odd dimensions, so we just need to crop it to maxPreviewSize
-    filters.push(`[0:v:0]crop=${maxPreviewSize.width}:${maxPreviewSize.height}:0:0[max]`);
+    filters.push(`[vin]crop=${maxPreviewSize.width}:${maxPreviewSize.height}:0:0[max]`);
   } else {
     filters.push(
-      `[0:v:0]zscale=w=${maxPreviewSize.width}:h=${maxPreviewSize.height}:filter=lanczos[max]`,
+      `[vin]zscale=w=${maxPreviewSize.width}:h=${maxPreviewSize.height}:filter=lanczos[max]`,
     );
   }
 
