@@ -419,9 +419,11 @@ describe('Attachments', () => {
   });
 
   describe('List attachments', () => {
-    let mars;
+    let mars, attIds;
     before(async () => {
       mars = await createTestUser('mars');
+
+      attIds = [];
 
       for (let i = 0; i < 10; i++) {
         const data = new FormData();
@@ -431,7 +433,8 @@ describe('Attachments', () => {
           `test${i + 1}.txt`,
         );
         // eslint-disable-next-line no-await-in-loop
-        await performJSONRequest('POST', '/v1/attachments', data, authHeaders(mars));
+        const resp = await performJSONRequest('POST', '/v1/attachments', data, authHeaders(mars));
+        attIds.push(resp.attachments.id);
       }
     });
 
@@ -472,6 +475,27 @@ describe('Attachments', () => {
           hasMore: true,
         });
       }
+    });
+
+    it(`should get Mars'es attachments by ids`, async () => {
+      const otherId = '00000000-0000-4000-8000-000000000001';
+      const ids = [...attIds.slice(0, 4), otherId];
+      const resp = await performJSONRequest(
+        'POST',
+        '/v2/attachments/byIds',
+        { ids },
+        authHeaders(mars),
+      );
+      expect(resp, 'to satisfy', {
+        attachments: [
+          { fileName: 'test1.txt' },
+          { fileName: 'test2.txt' },
+          { fileName: 'test3.txt' },
+          { fileName: 'test4.txt' },
+        ],
+        users: [{ id: mars.user.id }],
+        idsNotFound: [otherId],
+      });
     });
 
     it(`should list the rest of Mars'es attachments`, async () => {

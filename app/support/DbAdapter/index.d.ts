@@ -223,6 +223,7 @@ export class DbAdapter {
 
   // Attachments
   getAttachmentById(id: UUID): Promise<Attachment | null>;
+  getAttachmentsByIds(ids: UUID[]): Promise<(Attachment | null)[]>;
   getPostAttachments(id: UUID): Promise<UUID[]>;
   getAttachmentsOfPost(postId: UUID): Promise<Attachment[]>;
   listAttachments(options: ListAttachmentsOptions): Promise<Attachment[]>;

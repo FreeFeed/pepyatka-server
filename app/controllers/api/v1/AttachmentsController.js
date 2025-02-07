@@ -3,6 +3,7 @@ import compose from 'koa-compose';
 import { isInt } from 'validator';
 import { lookup } from 'mime-types';
 import { mediaType } from '@hapi/accept';
+import { difference } from 'lodash';
 
 import {
   reportError,
@@ -12,11 +13,12 @@ import {
 } from '../../../support/exceptions';
 import { serializeAttachment } from '../../../serializers/v2/attachment';
 import { serializeUsersByIds } from '../../../serializers/v2/user';
-import { authRequired } from '../../middlewares';
+import { authRequired, inputSchemaRequired } from '../../middlewares';
 import { dbAdapter, Attachment } from '../../../models';
 import { startAttachmentsSanitizeJob } from '../../../jobs/attachments-sanitize';
 import { currentConfig } from '../../../support/app-async-context';
 import { getBestVariant } from '../../../support/media-files/geometry';
+import { getAttachmentsByIdsInputSchema } from '../v2/data-schemes/attachmants';
 
 export default class AttachmentsController {
   app;
@@ -285,4 +287,36 @@ export default class AttachmentsController {
       ctx.body = response;
     }
   }
+
+  getByIds = compose([
+    inputSchemaRequired(getAttachmentsByIdsInputSchema),
+    async (ctx) => {
+      const maxAttByIds = 100;
+
+      const { user: viewer, apiVersion } = ctx.state;
+      const { ids } = ctx.request.body;
+
+      const hasMore = ids.length > maxAttByIds;
+
+      if (hasMore) {
+        ids.length = maxAttByIds;
+      }
+
+      const atts = (await dbAdapter.getAttachmentsByIds(ids)).filter(Boolean);
+
+      const attachments = atts.map((a) => serializeAttachment(a, apiVersion));
+      const users = await serializeUsersByIds(
+        atts.map((a) => a.userId),
+        viewer?.id,
+      );
+      const idsFound = atts.map((p) => p.id);
+      const idsNotFound = difference(ids, idsFound);
+
+      ctx.body = {
+        attachments,
+        users,
+        idsNotFound,
+      };
+    },
+  ]);
 }
