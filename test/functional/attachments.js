@@ -14,6 +14,7 @@ import { initJobProcessing } from '../../app/jobs';
 import { eventNames, PubSubAdapter } from '../../app/support/PubSubAdapter';
 import { getSingleton } from '../../app/app';
 import { withModifiedConfig } from '../helpers/with-modified-config';
+import { API_VERSION_4 } from '../../app/api-versions';
 
 import {
   createTestUser,
@@ -324,13 +325,13 @@ describe('Attachments', () => {
     // At first, we should have a stub file
     expect(resp, 'to satisfy', {
       attachments: {
-        fileName: 'polyphon.tmp',
+        fileName: 'polyphon.mp4',
         mediaType: 'general',
         fileSize: '29',
         createdAt: attObj.createdAt.getTime().toString(),
         updatedAt: attObj.updatedAt.getTime().toString(),
-        url: attObj.getFileUrl('', 'tmp'),
-        thumbnailUrl: attObj.getFileUrl('', 'tmp'),
+        url: attObj.getFileUrl('', 'mp4'),
+        thumbnailUrl: attObj.getFileUrl('', 'mp4'),
         imageSizes: expect.it('to equal', {}),
         createdBy: luna.user.id,
         postId: null,
@@ -691,17 +692,31 @@ describe('Attachments', () => {
       const app = await getSingleton();
       const port = process.env.PEPYATKA_SERVER_PORT || app.context.config.port;
 
-      lunaSubscribedToHerChannel = await Session.create(port, 'Luna subscribed to her channel');
+      lunaSubscribedToHerChannel = await Session.create(port, 'Luna subscribed to her channel', {
+        query: { apiVersion: API_VERSION_4 },
+      });
       await lunaSubscribedToHerChannel.sendAsync('auth', { authToken: luna.authToken });
 
-      lunaSubscribedToPost = await Session.create(port, 'Luna subscribed to post');
+      lunaSubscribedToPost = await Session.create(port, 'Luna subscribed to post', {
+        query: { apiVersion: API_VERSION_4 },
+      });
       await lunaSubscribedToPost.sendAsync('auth', { authToken: luna.authToken });
 
-      lunaSubscribedToAttachment = await Session.create(port, 'Luna subscribed to attachment');
+      lunaSubscribedToAttachment = await Session.create(port, 'Luna subscribed to attachment', {
+        query: { apiVersion: API_VERSION_4 },
+      });
       await lunaSubscribedToAttachment.sendAsync('auth', { authToken: luna.authToken });
 
-      anonSubscribedToPost = await Session.create(port, 'Anonymous subscribed to post');
-      anonSubscribedToAttachment = await Session.create(port, 'Anonymous subscribed to attachment');
+      anonSubscribedToPost = await Session.create(port, 'Anonymous subscribed to post', {
+        query: { apiVersion: API_VERSION_4 },
+      });
+      anonSubscribedToAttachment = await Session.create(
+        port,
+        'Anonymous subscribed to attachment',
+        {
+          query: { apiVersion: API_VERSION_4 },
+        },
+      );
     });
     afterEach(() =>
       [
@@ -735,9 +750,7 @@ describe('Attachments', () => {
           lunaSubscribedToHerChannel.haveCollected(eventNames.ATTACHMENT_CREATED),
         ]);
 
-        expect(events, 'to satisfy', [
-          { attachments: { id: attId, url: expect.it('to end with', '.tmp') } },
-        ]);
+        expect(events, 'to satisfy', [{ attachments: { id: attId, meta: { inProgress: true } } }]);
         clearCollected();
       }
 
@@ -752,9 +765,9 @@ describe('Attachments', () => {
         ]);
 
         expect(events, 'to satisfy', [
-          { attachments: { id: attId, url: expect.it('to end with', '.tmp') } },
-          { attachments: { id: attId, url: expect.it('to end with', '.tmp') } },
-          { attachments: { id: attId, url: expect.it('to end with', '.tmp') } },
+          { attachments: { id: attId, meta: { inProgress: true } } },
+          { attachments: { id: attId, meta: { inProgress: true } } },
+          { attachments: { id: attId, meta: { inProgress: true } } },
         ]);
       }
 
@@ -778,17 +791,17 @@ describe('Attachments', () => {
         ]);
 
         expect(events, 'to satisfy', [
-          { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
+          { attachments: { id: attId, previewTypes: ['image', 'video'] } },
           {
             posts: { id: post.id },
-            attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
+            attachments: [{ id: attId, previewTypes: ['image', 'video'] }],
           },
-          { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
+          { attachments: { id: attId, previewTypes: ['image', 'video'] } },
           {
             posts: { id: post.id },
-            attachments: [{ id: attId, url: expect.it('to end with', '.mp4') }],
+            attachments: [{ id: attId, previewTypes: ['image', 'video'] }],
           },
-          { attachments: { id: attId, url: expect.it('to end with', '.mp4') } },
+          { attachments: { id: attId, previewTypes: ['image', 'video'] } },
         ]);
       }
     });

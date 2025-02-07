@@ -1,6 +1,7 @@
 import { API_VERSION_3 } from '../../api-versions';
 import type { Attachment } from '../../models';
 import { currentConfig } from '../../support/app-async-context';
+import { setExtension } from '../../support/media-files/file-ext';
 import type { MediaMetaData, MediaPreviews, MediaType } from '../../support/media-files/types';
 import type { ISO8601DateTimeString, UUID } from '../../support/types';
 
@@ -118,6 +119,13 @@ function serializeAttachmentV2(att: Attachment): SerializedAttachmentV2 {
 
   if (att.meta.inProgress) {
     result.inProgress = true;
+
+    if (att.mediaType === 'video') {
+      // Optimistically set the URL as the URL of after-processed video
+      result.fileName = setExtension(att.fileName, 'mp4');
+      result.url = currentConfig().attachments.url + att.getRelFilePath('', 'mp4');
+      result.thumbnailUrl = result.url;
+    }
   }
 
   return result;
