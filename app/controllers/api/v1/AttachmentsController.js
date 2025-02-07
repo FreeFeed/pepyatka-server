@@ -173,7 +173,7 @@ export default class AttachmentsController {
     const { attId, type } = ctx.params;
     const { query } = ctx.request;
     const { useImgProxy } = currentConfig().attachments;
-    const imageFormats = ['jpeg', 'webp', 'avif'];
+    const imageFormats = ['webp', 'jpeg', 'avif'];
     const formatExtensions = {
       jpeg: 'jpg',
       webp: 'webp',
