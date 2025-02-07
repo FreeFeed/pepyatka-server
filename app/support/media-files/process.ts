@@ -275,22 +275,35 @@ async function processAudio(
   }
 
   const variant = 'a1';
-  const ext = 'm4a';
+  const ext = info.aCodec === 'mp3' ? 'mp3' : 'm4a';
+  const fmt = info.aCodec === 'mp3' ? 'mp3' : 'mp4';
   const outFile = tmpFileVariant(localFilePath, variant, ext);
+
+  const commands = [];
+
+  if (info.aCodec === 'mp3' || info.aCodec === 'aac') {
+    // Use unmodified audio track
+    commands.push(
+      ['-c:a', 'copy'], // Copy the audio stream
+    );
+  } else {
+    commands.push(
+      ['-c:a', 'aac'], // Convert to AAC
+      ['-b:a', '192k'], // Set bitrate to 192k
+    );
+  }
 
   await spawnAsync('ffmpeg', [
     '-hide_banner',
-    ['-err_detect', 'explode', '-xerror'], // Fail on error
     ['-loglevel', 'error'],
     ['-i', localFilePath],
     '-y', // Overwrite existing file
     ['-map', '0:a:0'], // Use only the first audio stream
-    ['-c:a', 'aac'], // Convert to AAC
-    ['-b:a', '192k'], // Set bitrate to 192k
+    ...commands,
     '-sn', // Skip subtitles (if any)
     '-dn', // Skip other data (if any)
     ['-map_metadata', '-1'], // Remove all metadata
-    ['-f', 'mp4'], // Output in m4a/mov container
+    ['-f', fmt], // Output container format
     outFile,
   ]);
 
