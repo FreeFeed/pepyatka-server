@@ -943,8 +943,8 @@ describe('Attachments', () => {
             `/v4/attachments/${att.id}/image?width=100&height=100`,
           );
           expect(resp, 'to satisfy', {
-            url: `${att.getFileUrl('thumbnails')}?format=jpeg&width=100&height=100`,
-            mimeType: 'image/jpeg',
+            url: `${att.getFileUrl('thumbnails')}?width=100&height=100`,
+            mimeType: 'image/webp',
             width: 100,
             height: 100,
           });
