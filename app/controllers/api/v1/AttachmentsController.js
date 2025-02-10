@@ -241,8 +241,8 @@ export default class AttachmentsController {
       response.width = prv.w;
       response.height = prv.h;
 
-      // With imgproxy, we can resize images and change their format
-      if (type === 'image' && useImgProxy) {
+      // With imgproxy, we can resize images (except SVG) and change their format
+      if (useImgProxy && type === 'image' && attachment.fileExtension !== 'svg') {
         let { format } = query;
 
         if (!format) {
