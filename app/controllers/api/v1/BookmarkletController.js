@@ -1,6 +1,6 @@
 import compose from 'koa-compose';
 
-import { Post, Comment, AppTokenV1 } from '../../../models';
+import { Post, Comment, AppTokenV1, Attachment } from '../../../models';
 import { ForbiddenException } from '../../../support/exceptions';
 import { authRequired, monitored, inputSchemaRequired } from '../../middlewares';
 import { show as showPost } from '../v2/PostsController';
@@ -79,9 +79,7 @@ async function createAttachment(author, imageURL) {
       throw new Error(`Unsupported content type: '${file.type}'`);
     }
 
-    const newAttachment = author.newAttachment({ file });
-    await newAttachment.create();
-
+    const newAttachment = await Attachment.create(file.path, file.name, author);
     return newAttachment.id;
   } catch (e) {
     await file.unlink();

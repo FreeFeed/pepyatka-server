@@ -6,12 +6,14 @@ import { pipeline, finished } from 'stream/promises';
 
 import meter from 'stream-meter';
 import mediaType from 'media-type';
-import { parse as bytesParse } from 'bytes';
 import config from 'config';
 
-const fileSizeLimit = bytesParse(config.attachments.fileSizeLimit);
+const sizeLimits = config.attachments.fileSizeLimitByType;
 
-export async function downloadURL(url: string) {
+export async function downloadURL(
+  url: string,
+  sizeLimit = sizeLimits['image'] ?? sizeLimits['default'],
+) {
   const parsedURL = new URL(url);
 
   if (parsedURL.protocol !== 'http:' && parsedURL.protocol !== 'https:') {
@@ -43,8 +45,8 @@ export async function downloadURL(url: string) {
   if (response.headers.has('content-length')) {
     const contentLength = parseInt(response.headers.get('content-length')!);
 
-    if (!isNaN(contentLength) && contentLength > fileSizeLimit) {
-      throw new Error(`File is too large (${contentLength} bytes, max. ${fileSizeLimit})`);
+    if (!isNaN(contentLength) && contentLength > sizeLimit) {
+      throw new Error(`File is too large (${contentLength} bytes, max. ${sizeLimit})`);
     }
   }
 
@@ -54,7 +56,7 @@ export async function downloadURL(url: string) {
     // @ts-expect-error
     const inStream = response.body as NodeJS.ReadableStream;
     const outStream = createWriteStream(filePath, { flags: 'w' });
-    await pipeline(inStream, meter(fileSizeLimit), outStream);
+    await pipeline(inStream, meter(sizeLimit), outStream);
     await finished(outStream); // wait for the file to be written and closed
 
     const stats = await fs.stat(filePath);

@@ -128,6 +128,7 @@ config.media = {
     'image/png',
     'image/gif',
     'image/webp',
+    'image/avif',
     'audio/mpeg',
     'audio/mp4',
     'audio/ogg',
@@ -158,18 +159,15 @@ config.attachments = {
   url: defer((cfg) => cfg.media.url),
   storage: defer((cfg) => cfg.media.storage),
   path: 'attachments/', // must have trailing slash
-  fileSizeLimit: 10 * 1000 * 1000,
-  maxCount: 20,
-  imageSizes: {
-    t: {
-      path: 'attachments/thumbnails/', // must have trailing slash
-      bounds: { width: 525, height: 175 },
-    },
-    t2: {
-      path: 'attachments/thumbnails2/', // must have trailing slash
-      bounds: { width: 1050, height: 350 },
-    },
+  fileSizeLimitByType: {
+    // Limits for each file type
+    video: 500 * 1024 * 1024,
+    default: 50 * 1024 * 1024, // Must exist
   },
+  fileSizeLimit: defer((cfg) => Math.max(...Object.values(cfg.attachments.fileSizeLimitByType))),
+  // Number of user media files in the processing queue
+  userMediaProcessingLimit: 5,
+  maxCount: 20,
   sanitizeMetadata: {
     // Media tags to remove via exiftool (using in Attachment.sanitizeMetadata)
     removeTags: [/GPS/i, /Serial/i, /Owner/i],
@@ -178,6 +176,24 @@ config.attachments = {
   },
   // Use https://imgproxy.net/ to dynamically create image thumbnails
   useImgProxy: false,
+  previews: {
+    imagePreviewAreas: {
+      p1: 120_000,
+      p2: 400_000,
+      p3: 1_200_000,
+      p4: 4_000_000,
+    },
+    legacyImagePreviewSizes: {
+      thumbnails: { width: 525, height: 175 },
+      thumbnails2: { width: 1050, height: 350 },
+    },
+    videoPreviewShortSides: {
+      // Sizes in pixels of the shortest side of the preview. Must be a multiple of 2!
+      v1: 480,
+      v2: 720,
+      v3: 1080,
+    },
+  },
 };
 config.profilePictures = {
   defaultProfilePictureMediumUrl: 'http://placekitten.com/50/50',
@@ -462,6 +478,7 @@ config.rateLimit = {
     maxRequests: {
       all: 10, // all methods
       GET: 100, // optional
+      'GET /vN/attachments/:attId/:type': 1000,
     },
   },
   authenticated: {
@@ -470,6 +487,7 @@ config.rateLimit = {
       all: 30,
       GET: 200,
       POST: 60,
+      'GET /vN/attachments/:attId/:type': 1000,
     },
   },
   maskingKeyRotationInterval: 'P7D', // ISO 8601 duration

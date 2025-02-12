@@ -6,4 +6,8 @@ export default function addRoutes(app) {
   app.get('/attachments/my', controller.my);
   app.get('/attachments/my/stats', controller.myStats);
   app.post('/attachments/my/sanitize', controller.mySanitize);
+  app.get('/attachments/:attId', controller.getById);
+  app.get('/attachments/:attId/:type', controller.getPreview);
+  // We use POST here because this method can accept many post IDs
+  app.post('/attachments/byIds', controller.getByIds);
 }

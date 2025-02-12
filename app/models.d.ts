@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { Config } from 'config';
 
 import { DbAdapter, type InvitationRecord } from './support/DbAdapter';
 import PubSubAdapter from './pubsub';
@@ -6,6 +7,7 @@ import { GONE_NAMES } from './models/user';
 import { ISO8601DateTimeString, ISO8601DurationString, Nullable, UUID } from './support/types';
 import { SessionTokenV1Store } from './models/auth-tokens';
 import { List } from './support/open-lists';
+import { MediaMetaData, MediaPreviews, MediaType } from './support/media-files/types';
 
 export const postgres: Knex;
 export const dbAdapter: DbAdapter;
@@ -168,6 +170,7 @@ export class Post {
   isVisibleFor(viewer: Nullable<User>): Promise<boolean>;
   getCommentsListeners(): Promise<UUID[]>;
   getUserSpecificProps(user: User): Promise<PostUserState>;
+  linkAttachments(attachments: UUID[]): Promise<void>;
 }
 
 export class Timeline {
@@ -192,10 +195,36 @@ type AttachmentParams = {
 };
 export class Attachment {
   id: UUID;
+  mediaType: MediaType;
+  fileName: string;
+  fileExtension: string;
   fileSize: number;
+  mimeType: string;
   sanitized: number;
+  readonly previews: MediaPreviews;
+  meta: MediaMetaData;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: UUID;
+  postId: UUID | null;
+
   constructor(params: AttachmentParams);
-  create(): Promise<void>;
+  static create(
+    filePath: string,
+    fileName: string,
+    user: User,
+    postId?: UUID | null,
+  ): Promise<Attachment>;
+  finalizeCreation(filePath: string): Promise<void>;
+  getRelFilePath(variant: string, ext?: string | null): string;
+  getLocalFilePath(variant: string, ext?: string | null): string;
+  getFileUrl(variant: string, ext?: string | null): string;
+  allFileVariants(includeOriginal?: boolean): { variant: string; ext: string }[];
+  allRelFilePaths(includeOriginal?: boolean): string[];
+  maxSizedVariant(mediaType: 'image' | 'video'): string | null;
   downloadOriginal(): Promise<string>;
   sanitizeOriginal(): Promise<boolean>;
   destroy(destroyedBy?: User): Promise<void>;
@@ -255,8 +284,11 @@ export type JobHandler<P> = (job: Job<P>) => Promise<unknown>;
 export type JobMiddleware = (h: JobHandler<unknown>) => JobHandler<unknown>;
 
 export class JobManager {
+  limitedJobs: Record<string, number>;
+  constructor(params?: Partial<Config['jobManager'] & { limitedJobs: Record<string, number> }>);
   on<P = unknown>(name: string, handler: JobHandler<P>): () => void;
-  fetchAndProcess(): Promise<Job>;
+  fetch(count?: number, lockTime?: number): Promise<Job[]>;
+  fetchAndProcess(count?: number, lockTime?: number): Promise<Job[]>;
   use(mw: JobMiddleware): void;
 }
 

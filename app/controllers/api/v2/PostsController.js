@@ -64,26 +64,28 @@ export const opengraph = compose([
 
     if (attachments.length > 0) {
       for (const item of attachments) {
-        if (item.mediaType === 'image') {
-          let image_size;
-
+        if (item.previews.image) {
           // Image fallback: thumbnail 2 (t2) => thumbnail (t) => original (o) => none
           // Posts created in older versions of FreeFeed had only one thumbnail (t)
-          if (`t2` in item.imageSizes) {
-            image_size = `t2`; // Use high-res thumbnail
-            image = item.imageSizes[image_size].url;
-          } else if (`t` in item.imageSizes) {
-            image_size = `t`; // Use thumbnail
-            image = item.thumbnailUrl;
-          } else if (`o` in item.imageSizes) {
-            image_size = `o`; // Use original image if there are no thumbnails present
-            image = item.url;
+          let variant = null;
+
+          if ('thumbnails2' in item.previews.image) {
+            variant = 'thumbnails2';
+          } else if ('thumbnails' in item.previews.image) {
+            variant = 'thumbnails';
           } else {
-            break;
+            // Looking for maximum size
+            variant = item.maxSizedVariant('image');
           }
 
-          image_h = item.imageSizes[image_size].h;
-          image_w = item.imageSizes[image_size].w;
+          if (!variant) {
+            continue;
+          }
+
+          const p = item.previews.image[variant];
+          image = item.getFileUrl(variant);
+          image_h = p.h;
+          image_w = p.w;
           break;
         }
       }

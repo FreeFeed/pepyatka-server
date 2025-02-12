@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - Not released
+### Changed
+- The media files (attachments) handling algorithm has been changed. There are
+  four media types now: 'image', 'video', 'audio' and 'general'. Images are
+  accepted in JPEG, PNG, WebP, GIF, HEIC/HEIF and AVIF formats. Also now we
+  accept and process arbitrary formats of video and audio files (detected with
+  ffmpeg).
+
+  For the visual files (images and videos), the multiple preview sizes are
+  created, in addition to the legacy 'thumbnail' and 'thumbnail2'.
+
+  The animated GIF images are now treated as video files and the video previews
+  are created for them.
+
+  We don't keep the originals for the truly (not from animated images) video
+  files. After the preview creation, the largest preview is kept as the
+  'original'.
+
+  Some media files (the truly video ones for now) are processed asynchronously.
+  Right after they are uploaded to the server, the asynchronous job is
+  scheduled, and after the job finishes, the 'attachment:update' realtime event
+  is sent to the 'user:{ownerId}', 'attachment:{attachmentId}' and
+  'post:{postId}' (if the file is attached to a post) channels.
+
+  The `attachments` table now has a few new columns:
+  - `width` and `height`: size of the original image or video file in pixels
+    (null for non-visual files)
+  - `duration`: duration of the video or audio in seconds (null for non-playable
+    files)
+  - `previews`: JSON object with preview types and sizes, see the
+    _MediaPreviews_ type in the
+    [app/support/media-files/types.ts](app/support/media-files/types.ts) file.
+  - `meta`: JSON object with temporary or not essential media metadata. It can
+    contain the audio/video title, album title and author name (in 'dc:title',
+    'dc:relation.isPartOf' and 'dc:creator' fields, respectively) and some
+    special flags:
+    - `animatedImage`: true if the video was created from an animated image
+    - `silent`: true if the video has no audio track
+    - `inProgress`: true if the media file is currently being processed
+### Added
+- The new V4 API version is introduced, to support the new attachment features.
+  See the new serialized attachment type `SerializedAttachmentV4` in the
+  [app/serializers/v2/attachment.ts](app/serializers/v2/attachment.ts) file.
+- The new `GET /vN/attachments/:attId` API endpoint returns the attachment by
+  its ID.
+- The new `POST /vN/attachments/byIds` API endpoint returns attachments by their
+  IDs. Request body: `{"ids": [...]}`. Response body: `{ "attachments": [...],
+  "users": [...], "idsNotFound": [...] }`.
+- The new `GET /vN/attachments/:attId/:type` API endpoint returns the preview or
+  the original of the attachment. The _type_ parameter can be 'original',
+  'image', 'video' or 'audio'. The returned data is a JSON object with the following
+  fields:
+  - _url_ - the URL of the preview/original file
+  - _mimeType_ - the MIME type of the preview/original file
+  - _width_ and _height_ (optional) - the size in pixels if the file is visual
+  
+  This endpoint accepts the following query parameters (all optional):
+  - _width_ and _height_ - the desired 'image'/'video' preview size in pixels
+  - _format_ - the desired 'image' preview format: 'jpeg', 'webp', 'avif'
+  - _redirect_ - if present, the response will be a 302 redirect to the file
+  
+  The server will choose the best available preview to fill the given size. It
+  is not guaranteed that the returned preview will be of the requested size and
+  format, but it will be as close as possible.
+- Allow to limit the number of simultaneous executions for some job types.
+
+  The JobManager now has a `limitedJobs` parameter of type `Record<string,
+  number>`, that defines the maximum number of simultaneous executions for each
+  job of given type (name). Other jobs, that are not listed in `limitedJobs` are
+  executed without limits.
+
 ## [2.22.5] - 2025-01-05
 ### Added
 - New API method `GET /v2/cors-proxy?url=...`. This method acts as a simple

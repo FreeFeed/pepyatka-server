@@ -12,6 +12,8 @@ export default class Session {
   socket = null;
   name = '';
   listeners = new Set();
+  /** @type {{string: {event: string, data: unknown}[]} */
+  collected = [];
 
   static create(port, name = '', extraOptions = {}) {
     const options = {
@@ -53,6 +55,7 @@ export default class Session {
       packet.data = ['*'].concat(args);
       onevent.call(this, packet); // additional call to catch-all
     };
+    this.listeners.add(({ event, data }) => this.collected.push({ event, data }));
     socket.on('*', (event, data) => [...this.listeners].forEach((l) => l({ event, data })));
   }
 
@@ -157,5 +160,25 @@ export default class Session {
     const listen = this.receiveSeq(events);
     const [result] = await Promise.all([listen, ...tasks.map((t) => t())]);
     return result;
+  }
+
+  haveCollected(event) {
+    const found = this.collected.find(({ event: collectedEvent }) => collectedEvent === event);
+
+    if (found) {
+      return Promise.resolve(found.data);
+    }
+
+    return this.receive(event);
+  }
+
+  haveNotCollected(event) {
+    if (this.collected.some(({ event: collectedEvent }) => collectedEvent === event)) {
+      return Promise.reject(
+        new Error(`${this.name ? `${this.name}: ` : ''}Got unexpected '${event}' event`),
+      );
+    }
+
+    return this.notReceive(event);
   }
 }

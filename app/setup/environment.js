@@ -1,9 +1,11 @@
-import fs, { promises as fsPromises } from 'fs';
+import { access, constants } from 'fs/promises';
 
 import passport from 'koa-passport';
 import Raven from 'raven';
 import createDebug from 'debug';
 import config from 'config';
+
+import { currentConfig } from '../support/app-async-context';
 
 import { setSearchConfig as setPostgresSearchConfig } from './postgres';
 import { init as passportInit } from './initializers/passport';
@@ -40,26 +42,16 @@ passportInit(passport);
 const checkIfMediaDirectoriesExist = async () => {
   let gotErrors = false;
 
-  const attachmentsDir = config.attachments.storage.rootDir + config.attachments.path;
+  const attConf = currentConfig().attachments;
+
+  const attachmentsDir = attConf.storage.rootDir + attConf.path;
 
   try {
-    await fsPromises.access(attachmentsDir, fs.W_OK);
+    await access(attachmentsDir, constants.W_OK);
   } catch {
     gotErrors = true;
     log(`Attachments dir does not exist: ${attachmentsDir}`);
   }
-
-  const checkPromises = Object.values(config.attachments.imageSizes).map(async (sizeConfig) => {
-    const thumbnailsDir = config.attachments.storage.rootDir + sizeConfig.path;
-
-    try {
-      await fsPromises.access(thumbnailsDir, fs.W_OK);
-    } catch {
-      gotErrors = true;
-      log(`Thumbnails dir does not exist: ${thumbnailsDir}`);
-    }
-  });
-  await Promise.all(checkPromises);
 
   if (gotErrors) {
     throw new Error(`some of required directories are missing`);

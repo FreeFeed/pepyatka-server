@@ -133,4 +133,12 @@ export default class pubSub {
   async newEvent(eventId: UUID) {
     await this.publisher.eventCreated(JSON.stringify(eventId));
   }
+
+  async attachmentCreated(attachmentId: UUID) {
+    await this.publisher.attachmentCreated(JSON.stringify(attachmentId));
+  }
+
+  async attachmentUpdated(attachmentId: UUID) {
+    await this.publisher.attachmentUpdated(JSON.stringify(attachmentId));
+  }
 }

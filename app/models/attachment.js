@@ -1,72 +1,25 @@
 import { promises as fs, createReadStream } from 'fs';
-import childProcess from 'child_process';
-import { join, parse as parsePath } from 'path';
+import { extname, join, parse as parsePath } from 'path';
 import util from 'util';
 import os from 'os';
 
-import config from 'config';
 import createDebug from 'debug';
-import gm from 'gm';
-import mime from 'mime-types';
-import mmm from 'mmmagic';
-import _ from 'lodash';
+import mime, { lookup } from 'mime-types';
 import mv from 'mv';
-import gifsicle from 'gifsicle';
-import probe from 'probe-image-size';
 import Raven from 'raven';
-import { exiftool } from 'exiftool-vendored';
+import monitor from 'monitor-dog';
 
-import { getS3 } from '../support/s3';
+import { s3Client } from '../support/s3';
 import { sanitizeMediaMetadata, SANITIZE_NONE, SANITIZE_VERSION } from '../support/sanitize-media';
+import { processMediaFile } from '../support/media-files/process';
+import { currentConfig } from '../support/app-async-context';
+import { createPrepareVideoJob } from '../jobs/attachment-prepare-video';
+import { PubSub as pubSub } from '../models';
+import { TooManyRequestsException } from '../support/exceptions';
 
 const mvAsync = util.promisify(mv);
 
-const mimeMagic = new mmm.Magic(mmm.MAGIC_MIME_TYPE);
-const detectMime = util.promisify(mimeMagic.detectFile).bind(mimeMagic);
-
-const magic = new mmm.Magic();
-const detectFile = util.promisify(magic.detectFile).bind(magic);
-
-const execFile = util.promisify(childProcess.execFile);
-
 const debug = createDebug('freefeed:model:attachment');
-
-async function mimeTypeDetect(fileName, filePath) {
-  // We need to dynamic import from ES-only modules
-  const { fileTypeFromFile } = await import('file-type');
-  // The file type is detected by checking the magic number of the buffer.
-  const info = await fileTypeFromFile(filePath);
-
-  if (info && info.mime && info.mime !== 'application/octet-stream') {
-    return info.mime;
-  }
-
-  // legacy mmmagic based detection
-  let mimeType = 'application/octet-stream';
-
-  try {
-    mimeType = await detectMime(filePath);
-
-    if (mimeType === 'application/octet-stream') {
-      const typeOfFile = await detectFile(filePath);
-
-      if (typeOfFile.startsWith('Audio file with ID3')) {
-        mimeType = 'audio/mpeg';
-      }
-    }
-  } catch (e) {
-    if (_.isEmpty(mimeType)) {
-      throw e;
-    }
-  }
-
-  // otherwise, we'll use the fallback to content-type detected with a file extension provided by the user
-  if (mimeType === 'application/octet-stream') {
-    mimeType = mime.lookup(fileName) || mimeType;
-  }
-
-  return mimeType;
-}
 
 export function addModel(dbAdapter) {
   return class Attachment {
@@ -79,125 +32,255 @@ export function addModel(dbAdapter) {
       this.fileExtension = params.fileExtension; // jpg|png|gif etc, but empty for non-whitelisted types
       this.mediaType = params.mediaType; // image | audio | general
 
-      this.noThumbnail = params.noThumbnail; // if true, image thumbnail URL == original URL
-      this.imageSizes = params.imageSizes || {}; // pixel sizes of thumbnail(s) and original image, e.g. {t: {w: 200, h: 175}, o: {w: 600, h: 525}}
+      this.width = params.width;
+      this.height = params.height;
+      this.duration = params.duration;
 
-      this.artist = params.artist; // filled only for audio
-      this.title = params.title; // filled only for audio
+      if ((this.width === null || this.height === null) && params.imageSizes?.o) {
+        this.width = params.imageSizes.o.w;
+        this.height = params.imageSizes.o.h;
+      }
+
+      this._imageSizes = params.imageSizes; // pixel sizes of thumbnail(s) and original image, e.g. {t: {w: 200, h: 175}, o: {w: 600, h: 525}}
+      this._previews = params.previews;
+      this._meta = params.meta;
+
+      this._artist = params.artist; // filled only for audio
+      this._title = params.title; // filled only for audio
 
       this.userId = params.userId;
       this.postId = params.postId;
 
       this.sanitized = params.sanitized || SANITIZE_NONE;
 
-      if (parseInt(params.createdAt, 10)) {
-        this.createdAt = params.createdAt;
-      }
-
-      if (parseInt(params.updatedAt, 10)) {
-        this.updatedAt = params.updatedAt;
-      }
-
-      const storageConfig = params.storageConfig || config.attachments.storage;
-
-      this.s3 = storageConfig.type === 's3' ? getS3(storageConfig) : null;
-      this.s3bucket = storageConfig.type === 's3' ? storageConfig.bucket : null;
+      this.createdAt = params.createdAt;
+      this.updatedAt = params.updatedAt;
     }
 
-    get imageSizes() {
-      return this.imageSizes_;
-    }
-    set imageSizes(newValue) {
-      if (_.isString(newValue)) {
-        newValue = JSON.parse(newValue);
+    get previews() {
+      if (!this._previews) {
+        this._previews = this.getPreviewsDataForLegacyFile();
       }
 
-      this.imageSizes_ = newValue;
+      return this._previews;
     }
 
-    validate() {
-      const valid =
-        this.file &&
-        Object.keys(this.file).length > 0 &&
-        this.file.path &&
-        this.file.path.length > 0 &&
-        this.userId &&
-        this.userId.length > 0;
-
-      if (!valid) {
-        throw new Error('Invalid');
+    get meta() {
+      if (!this._meta) {
+        this._meta = this.getMetaDataForLegacyFile();
       }
+
+      return this._meta;
     }
 
-    async create() {
-      this.createdAt = new Date().getTime();
-      this.updatedAt = new Date().getTime();
-      this.postId = this.postId || '';
+    getPreviewsDataForLegacyFile() {
+      const result = {};
 
-      this.validate();
+      if (this.mediaType === 'image') {
+        const variants = {
+          o: '',
+          t: 'thumbnails',
+          t2: 'thumbnails2',
+        };
 
-      this.id = await dbAdapter.createAttachment({
-        postId: this.postId,
-        createdAt: this.createdAt.toString(),
-        updatedAt: this.updatedAt.toString(),
-      });
+        result.image = {};
 
-      this.fileName = this.file.name;
-      this.fileSize = this.file.size;
-      this.mimeType = this.file.type;
+        for (const [key, variant] of Object.entries(variants)) {
+          const entry = this._imageSizes[key];
 
-      // Determine initial file extension
-      // (it might be overridden later when we know MIME type from its contents)
-      const { supportedExtensions } = config.media;
-      this.fileExtension = '';
+          if (!entry) {
+            continue;
+          }
 
-      if (this.fileName && this.fileName.match(supportedExtensions) !== null) {
-        const m = /\.([^.]+)$/.exec(this.fileName);
-        const ext = m[1].toLowerCase();
-
-        if (supportedExtensions.includes(ext)) {
-          this.fileExtension = ext;
+          result.image[variant] = {
+            w: entry.w,
+            h: entry.h,
+            ext: entry.url.split('.').pop(),
+          };
         }
       }
 
-      await this.handleMedia();
+      if (this.mediaType === 'audio') {
+        result.audio = {
+          '': { ext: this.fileExtension },
+        };
+      }
+
+      return result;
+    }
+
+    getMetaDataForLegacyFile() {
+      const result = {};
+
+      if (this.mediaType === 'audio') {
+        if (this._title) {
+          result['dc:title'] = this._title;
+        }
+
+        if (this._artist) {
+          result['dc:creator'] = this._artist;
+        }
+      }
+
+      return result;
+    }
+
+    static async create(filePath, fileName, user, postId = null) {
+      let sanitized = SANITIZE_NONE;
+
+      if (user.preferences.sanitizeMediaMetadata) {
+        await sanitizeMediaMetadata(filePath);
+        sanitized = SANITIZE_VERSION;
+      }
+
+      const { files = {}, ...mediaData } = await processMediaFile(filePath, fileName);
+
+      if (mediaData.meta?.inProgress) {
+        // How many of user's media are currently being processed?
+        const limit = currentConfig().attachments.userMediaProcessingLimit;
+        const inProgressMedia = await dbAdapter.getInProgressAttachmentsNumber(user.id);
+
+        if (inProgressMedia >= limit) {
+          // User has too many media in progress, don't process any more
+          await Promise.all(Object.values(files).map((file) => fs.unlink(file.path)));
+
+          throw new TooManyRequestsException(
+            `You cannot process more than ${limit} media files at the same time. Please try again later.`,
+          );
+        }
+      }
 
       // Save record to DB
       const params = {
-        fileName: this.fileName,
-        fileSize: this.fileSize,
-        mimeType: this.mimeType,
-        mediaType: this.mediaType,
-        fileExtension: this.fileExtension,
-        noThumbnail: this.noThumbnail,
-        imageSizes: JSON.stringify(this.imageSizes),
-        userId: this.userId,
-        postId: this.postId,
-        createdAt: this.createdAt.toString(),
-        updatedAt: this.updatedAt.toString(),
-        sanitized: this.sanitized,
+        ...mediaData,
+        sanitized,
+        postId,
+        userId: user.id,
       };
 
-      if (this.mediaType === 'audio') {
-        params.artist = this.artist;
-        params.title = this.title;
+      const id = await dbAdapter.createAttachment(params);
+      /** @type {Attachment} */
+      const object = await dbAdapter.getAttachmentById(id);
+
+      if (object.meta.inProgress) {
+        await createPrepareVideoJob({ attId: id, filePath: files['original'].path });
+        delete files['original'];
       }
 
-      await dbAdapter.updateAttachment(this.id, params);
+      // Upload or move files
+      await object._placeFiles(files);
 
-      return this;
+      // Realtime events
+      await pubSub.attachmentCreated(id);
+
+      monitor.increment('users.attachments');
+      return object;
     }
 
-    get url() {
-      return config.attachments.url + config.attachments.path + this.getFilename();
-    }
+    /**
+     * Finalize attachment creation (called from the ATTACHMENT_PREPARE_VIDEO
+     * job handler). This method doesn't update attachment object itself.
+     *
+     * @param {string} filePath
+     * @returns {Promise<void>}
+     */
+    async finalizeCreation(filePath) {
+      try {
+        const { files = {}, ...mediaData } = await processMediaFile(filePath, this.fileName, {
+          synchronous: true,
+        });
 
-    get thumbnailUrl() {
-      if (this.noThumbnail === '1') {
-        return this.url;
+        if (!files['']) {
+          throw new Error('No original file to upload');
+        }
+
+        // Upload or move files
+        await this._placeFiles(files);
+
+        // Delete stub file
+        await this.deleteFiles();
+
+        // Update data
+        await dbAdapter.updateAttachment(this.id, { ...mediaData, updatedAt: 'now' });
+      } catch (err) {
+        debug(`finalizeCreation error: ${err.message}, treat file as 'general' type`);
+
+        const { size: fileSize } = await fs.stat(filePath);
+        const ext = extname(this.fileName)
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '') // Only the restricted set of chars is allowed
+          .slice(0, 6); // Limit the length of the extension
+
+        // Upload or move files
+        await this._placeFiles({ '': { path: filePath, ext } });
+
+        // Delete stub file
+        await this.deleteFiles();
+
+        // Update data
+        const toUpdate = {
+          updatedAt: 'now',
+          mediaType: 'general',
+          fileExtension: ext,
+          fileSize,
+          mimeType: lookup(ext) || 'application/octet-stream',
+          previews: {},
+          meta: {},
+          width: null,
+          height: null,
+          duration: null,
+        };
+        await dbAdapter.updateAttachment(this.id, toUpdate);
       }
 
-      return this.getResizedImageUrl('t');
+      // Realtime events
+      await pubSub.attachmentUpdated(this.id);
+
+      if (this.postId) {
+        await pubSub.updatePost(this.postId);
+      }
+    }
+
+    /**
+     * Upload or move processed files (original or previews)
+     *
+     * @param {import('../support/media-files/types').FilesToUpload} files
+     * @returns {Promise<void>}
+     */
+    async _placeFiles(files) {
+      const storageConfig = currentConfig().attachments.storage;
+      await Promise.all(
+        Object.entries(files).map(async ([variant, { path, ext }]) => {
+          if (storageConfig.type === 's3') {
+            const mimeType = mime.lookup(ext) || 'application/octet-stream';
+            await this.uploadToS3(path, this.getRelFilePath(variant, ext), mimeType);
+            await fs.unlink(path);
+          } else {
+            await mvAsync(path, this.getLocalFilePath(variant, ext), { mkdirp: true });
+          }
+        }),
+      );
+    }
+
+    /**
+     * @param {string} variant
+     * @param {string|null} ext
+     * @return {string}
+     */
+    getRelFilePath(variant, ext = null) {
+      if (ext === null) {
+        ext = this.allFileVariants().find(({ variant: v }) => v === variant)?.ext ?? 'unknown';
+      }
+
+      return `${currentConfig().attachments.path}${variant ? `${variant}/` : ''}${this.id}${ext ? `.${ext}` : ''}`;
+    }
+
+    getLocalFilePath(variant, ext = null) {
+      return currentConfig().attachments.storage.rootDir + this.getRelFilePath(variant, ext);
+    }
+
+    getFileUrl(variant, ext = null) {
+      return currentConfig().attachments.url + this.getRelFilePath(variant, ext);
     }
 
     // Get user who created the attachment (via Promise, for serializer)
@@ -205,288 +288,15 @@ export function addModel(dbAdapter) {
       return dbAdapter.getUserById(this.userId);
     }
 
-    // Get public URL of attachment (via Promise, for serializer)
-    getUrl() {
-      return config.attachments.url + config.attachments.path + this.getFilename();
-    }
-
-    // Get public URL of attachment's thumbnail (via Promise, for serializer)
-    getThumbnailUrl() {
-      if (this.noThumbnail === '1') {
-        return this.getUrl();
-      }
-
-      return this.getResizedImageUrl('t');
-    }
-
-    // Get public URL of resized image attachment
-    getResizedImageUrl(sizeId) {
-      return (
-        config.attachments.url +
-        config.attachments.imageSizes[sizeId].path +
-        this.getFilename(this.getResizedImageExtension())
-      );
-    }
-
-    // Get local filesystem path for original file
-    getPath() {
-      return config.attachments.storage.rootDir + config.attachments.path + this.getFilename();
-    }
-
-    getResizedImageExtension() {
-      return this.fileExtension === 'webp' ? 'jpg' : this.fileExtension;
-    }
-
-    getResizedImageMimeType() {
-      return this.fileExtension === 'webp' ? 'image/jpeg' : this.mimeType;
-    }
-
-    // Get local filesystem path for resized image file
-    getResizedImagePath(sizeId) {
-      return (
-        config.attachments.storage.rootDir +
-        config.attachments.imageSizes[sizeId].path +
-        this.getFilename(this.getResizedImageExtension())
-      );
-    }
-
-    // Get file name
-    getFilename(ext = null) {
-      if (ext || this.fileExtension) {
-        return `${this.id}.${ext || this.fileExtension}`;
-      }
-
-      return this.id;
-    }
-
-    // Store the file and process its thumbnail, if necessary
-    async handleMedia() {
-      const tmpAttachmentFile = this.file.path;
-      const tmpAttachmentFileName = this.file.name;
-
-      const supportedImageTypes = {
-        'image/jpeg': 'jpg',
-        'image/png': 'png',
-        'image/gif': 'gif',
-        'image/webp': 'webp',
-        'image/svg+xml': 'svg',
-      };
-      const supportedAudioTypes = {
-        'audio/mpeg': 'mp3',
-        'audio/x-m4a': 'm4a',
-        'audio/m4a': 'm4a',
-        'audio/mp4': 'm4a',
-        'audio/ogg': 'ogg',
-        'audio/x-wav': 'wav',
-      };
-
-      this.mimeType = await mimeTypeDetect(tmpAttachmentFileName, tmpAttachmentFile);
-      debug(`Mime-type of ${tmpAttachmentFileName} is ${this.mimeType}`);
-
-      const user = await this.getCreatedBy();
-
-      if (user.preferences.sanitizeMediaMetadata) {
-        await sanitizeMediaMetadata(tmpAttachmentFile);
-        this.sanitized = SANITIZE_VERSION;
-      }
-
-      if (supportedImageTypes[this.mimeType]) {
-        // Set media properties for 'image' type
-        this.mediaType = 'image';
-        this.fileExtension = supportedImageTypes[this.mimeType];
-        this.noThumbnail = '1'; // this may be overridden below
-        await this.handleImage(tmpAttachmentFile);
-      } else if (supportedAudioTypes[this.mimeType]) {
-        // Set media properties for 'audio' type
-        this.mediaType = 'audio';
-        this.fileExtension = supportedAudioTypes[this.mimeType];
-        this.noThumbnail = '1';
-
-        if (this.fileExtension === 'm4a') {
-          this.mimeType = 'audio/mp4'; // mime-type compatible with music-metadata
-        }
-
-        // Analyze metadata to get Artist & Title
-        //
-        // We need to dynamic import from ES-only modules. Also, for some reason
-        // the VSCode eslint extension cannot resolve the 'music-metadata'.
-        //
-        // eslint-disable-next-line import/no-unresolved
-        const { parseFile } = await import('music-metadata');
-        const { common: metadata } = await parseFile(tmpAttachmentFile);
-
-        debug(`Metadata of ${tmpAttachmentFileName}`, metadata);
-
-        this.title = metadata.title;
-
-        if (_.isArray(metadata.artist)) {
-          [this.artist] = metadata.artist;
-        } else {
-          this.artist = metadata.artist;
-        }
-      } else {
-        // Set media properties for 'general' type
-        this.mediaType = 'general';
-        this.noThumbnail = '1';
-      }
-
-      // Store an original attachment
-      if (this.s3) {
-        await this.uploadToS3(
-          tmpAttachmentFile,
-          config.attachments.path + this.getFilename(),
-          this.mimeType,
-        );
-        await fs.unlink(tmpAttachmentFile);
-      } else {
-        await mvAsync(tmpAttachmentFile, this.getPath(), {});
-      }
-    }
-
-    /**
-     * @param {string} originalFile
-     */
-    async handleImage(originalFile) {
-      const tmpResizedFile = (sizeId) => `${this.file.path}.resized.${sizeId}`;
-
-      // Store original image size
-      let originalSize = await getImageSize(originalFile);
-      this.imageSizes.o = {
-        w: originalSize.width,
-        h: originalSize.height,
-        url: this.getUrl(),
-      };
-
-      if (this.mimeType === 'image/svg+xml') {
-        return;
-      }
-
-      // Reserved for GM-style object
-      let originalImage = null;
-
-      // Fix EXIF orientation for original image, if JPEG
-      if (this.mimeType === 'image/jpeg') {
-        originalImage = gm(originalFile);
-        originalImage.writeAsync = util.promisify(originalImage.write);
-
-        const autoOrientCommands = await gmAutoOrientCommands(originalFile);
-
-        if (autoOrientCommands) {
-          const img = originalImage
-            .profile(`${__dirname}/../../lib/assets/sRGB.icm`)
-            .out(...autoOrientCommands)
-            .quality(95);
-          await img.writeAsync(originalFile);
-
-          originalImage = gm(originalFile);
-          originalImage.writeAsync = util.promisify(originalImage.write);
-
-          originalSize = await getImageSize(originalFile);
-          this.imageSizes.o.w = originalSize.width;
-          this.imageSizes.o.h = originalSize.height;
-        }
-
-        // In any case, clear all orientation tags
-        await clearOrientation(originalFile);
-      }
-
-      const thumbIds = [];
-
-      for (const sizeId of Object.keys(config.attachments.imageSizes)) {
-        const { bounds } = config.attachments.imageSizes[sizeId];
-
-        if (originalSize.width <= bounds.width && originalSize.height <= bounds.height) {
-          continue;
-        }
-
-        const size = fitIntoBounds(originalSize, bounds);
-        this.imageSizes[sizeId] = {
-          w: size.width,
-          h: size.height,
-          url: this.getResizedImageUrl(sizeId),
-        };
-        thumbIds.push(sizeId);
-      }
-
-      if (thumbIds.length === 0) {
-        // No thumbnails
-        return;
-      }
-
-      this.noThumbnail = '0';
-
-      if (this.mimeType === 'image/gif') {
-        // Resize gif using gifsicle
-        await Promise.all(
-          thumbIds.map(async (sizeId) => {
-            const { w, h } = this.imageSizes[sizeId];
-            await execFile(gifsicle, [
-              '--resize',
-              `${w}x${h}`,
-              '--resize-colors',
-              '128',
-              '--no-background',
-              '-o',
-              tmpResizedFile(sizeId),
-              originalFile,
-            ]);
-          }),
-        );
-      } else {
-        // Iterate over image sizes old-fashioned (and very synchronous) way
-        // because gm is acting up weirdly when writing files in parallel mode
-        if (originalImage === null) {
-          originalImage = gm(originalFile);
-          originalImage.writeAsync = util.promisify(originalImage.write);
-        }
-
-        for (const sizeId of thumbIds) {
-          const { w, h } = this.imageSizes[sizeId];
-          await originalImage // eslint-disable-line no-await-in-loop
-            .resizeExact(w, h)
-            .profile(`${__dirname}/../../lib/assets/sRGB.icm`)
-            // Use white background for transparent images
-            .background('white')
-            .extent('0x0')
-            .quality(95)
-            .setFormat(this.getResizedImageExtension())
-            .writeAsync(tmpResizedFile(sizeId));
-        }
-      }
-
-      // Save image (permanently)
-      if (this.s3) {
-        await Promise.all(
-          thumbIds.map(async (sizeId) => {
-            const { path } = config.attachments.imageSizes[sizeId];
-            const file = tmpResizedFile(sizeId);
-            await this.uploadToS3(
-              file,
-              path + this.getFilename(this.getResizedImageExtension()),
-              this.getResizedImageMimeType(),
-            );
-            await fs.unlink(file);
-          }),
-        );
-      } else {
-        await Promise.all(
-          thumbIds.map(async (sizeId) => {
-            const file = tmpResizedFile(sizeId);
-            await mvAsync(file, this.getResizedImagePath(sizeId), {});
-          }),
-        );
-      }
-    }
-
     // Upload original attachment or its thumbnail to the S3 bucket
-    async uploadToS3(sourceFile, destPath, mimeType) {
-      const dispositionName = this.fileExtension
-        ? parsePath(this.fileName).name + parsePath(destPath).ext // original extension for whitelisted types, but might be 'jpg' for webp
-        : this.fileName; // original extension for non-whitelisted types
+    async uploadToS3(sourceFile, destPath) {
+      const { bucket } = currentConfig().attachments.storage;
+      const dispositionName = parsePath(this.fileName).name + parsePath(destPath).ext;
+      const mimeType = mime.lookup(dispositionName) || 'application/octet-stream';
 
-      await this.s3.putObject({
+      await s3Client().putObject({
         ACL: 'public-read',
-        Bucket: this.s3bucket,
+        Bucket: bucket,
         Key: destPath,
         Body: createReadStream(sourceFile),
         ContentType: mimeType,
@@ -496,18 +306,74 @@ export function addModel(dbAdapter) {
 
     // Get cross-browser Content-Disposition header for attachment
     getContentDisposition(dispositionName) {
+      const mimeType = mime.lookup(dispositionName) || 'application/octet-stream';
+
       // Old browsers (IE8) need ASCII-only fallback filenames
       const fileNameAscii = dispositionName.replace(/[^\x00-\x7F]/g, '_');
 
       // Modern browsers support UTF-8 filenames
       const fileNameUtf8 = encodeURIComponent(dispositionName);
 
-      const disposition = config.media.inlineMimeTypes.includes(this.mimeType)
+      const disposition = currentConfig().media.inlineMimeTypes.includes(mimeType)
         ? 'inline'
         : 'attachment';
 
       // Inline version of 'attfnboth' method (http://greenbytes.de/tech/tc2231/#attfnboth)
       return `${disposition}; filename="${fileNameAscii}"; filename*=utf-8''${fileNameUtf8}`;
+    }
+
+    /**
+     * Get all file variants, including original (variant = '') and previews
+     *
+     * @param {boolean} includeOriginal
+     * @returns {{variant: string, ext: string}[]}
+     */
+    allFileVariants(includeOriginal = true) {
+      const variants = Object.values(this.previews).flatMap((vars) =>
+        Object.entries(vars).map(([variant, { ext }]) => ({ variant, ext })),
+      );
+
+      if (includeOriginal && !variants.some(({ variant }) => variant === '')) {
+        variants.push({ variant: '', ext: this.fileExtension });
+      }
+
+      return variants;
+    }
+
+    /**
+     * Get list of relative paths to attachment's files, including original and previews
+     *
+     * @param {boolean} includeOriginal
+     * @returns {string[]}
+     */
+    allRelFilePaths(includeOriginal = true) {
+      return this.allFileVariants(includeOriginal).map(({ variant, ext }) =>
+        this.getRelFilePath(variant, ext),
+      );
+    }
+
+    /**
+     * Return the largest available preview variant of given media type
+     *
+     * @param {'image'|'video'} mediaType
+     * @returns {string|null}
+     */
+    maxSizedVariant(mediaType) {
+      if (!this.previews[mediaType]) {
+        return null;
+      }
+
+      let maxW = 0;
+      let maxVariant = null;
+
+      for (const [variant, { w }] of Object.entries(this.previews[mediaType])) {
+        if (w > maxW) {
+          maxW = w;
+          maxVariant = variant;
+        }
+      }
+
+      return maxVariant;
     }
 
     async destroy() {
@@ -519,20 +385,17 @@ export function addModel(dbAdapter) {
      * Delete all attachment's files
      */
     async deleteFiles() {
-      const thumbIds = Object.keys(this.imageSizes).filter((s) => s !== 'o');
+      const storageConfig = currentConfig().attachments.storage;
 
-      if (this.s3) {
-        const keys = [
-          config.attachments.path + this.getFilename(),
-          ...thumbIds.map((s) => config.attachments.imageSizes[s].path + this.getFilename()),
-        ];
+      if (storageConfig.type === 's3') {
+        const keys = this.allRelFilePaths();
 
         await Promise.all(
           keys.map(async (Key) => {
             try {
-              await this.s3.deleteObject({
+              await s3Client().deleteObject({
                 Key,
-                Bucket: this.s3bucket,
+                Bucket: storageConfig.bucket,
               });
             } catch (err) {
               // It is ok if file isn't found
@@ -543,12 +406,10 @@ export function addModel(dbAdapter) {
           }),
         );
       } else {
-        const filePaths = [this.getPath(), ...thumbIds.map((s) => this.getResizedImagePath(s))];
-
         await Promise.all(
-          filePaths.map(async (filePath) => {
+          this.allRelFilePaths().map(async (path) => {
             try {
-              await fs.unlink(filePath);
+              await fs.unlink(storageConfig.rootDir + path);
             } catch (err) {
               // It is ok if file isn't found
               if (err.code !== 'ENOENT') {
@@ -568,10 +429,12 @@ export function addModel(dbAdapter) {
     async downloadOriginal() {
       const localFile = join(os.tmpdir(), `${this.id}.orig`);
 
-      if (this.s3) {
-        const { Body } = await this.s3.getObject({
-          Key: config.attachments.path + this.getFilename(),
-          Bucket: this.s3bucket,
+      const { type, bucket } = currentConfig().attachments.storage;
+
+      if (type === 's3') {
+        const { Body } = await s3Client().getObject({
+          Key: this.getRelFilePath('', this.fileExtension),
+          Bucket: bucket,
         });
 
         if (!Body) {
@@ -580,7 +443,7 @@ export function addModel(dbAdapter) {
 
         await fs.writeFile(localFile, Body);
       } else {
-        const filePath = this.getPath();
+        const filePath = this.getLocalFilePath('', this.fileExtension);
         await fs.copyFile(filePath, localFile);
       }
 
@@ -622,6 +485,8 @@ export function addModel(dbAdapter) {
             this.sanitized = updAtt.sanitized;
           }
 
+          await fs.unlink(localFile);
+
           return false;
         }
 
@@ -636,14 +501,15 @@ export function addModel(dbAdapter) {
         this.fileSize = updAtt.fileSize;
 
         // Uploading
-        if (this.s3) {
+
+        if (currentConfig().attachments.storage.type === 's3') {
           await this.uploadToS3(
             localFile,
-            config.attachments.path + this.getFilename(),
+            this.getRelFilePath('', this.fileExtension),
             this.mimeType,
           );
         } else {
-          await mvAsync(localFile, this.getPath(), {});
+          await mvAsync(localFile, this.getLocalFilePath('', this.fileExtension), { mkdirp: true });
         }
 
         return true;
@@ -661,96 +527,4 @@ export function addModel(dbAdapter) {
       }
     }
   };
-}
-
-async function getImageSize(fileName) {
-  const input = createReadStream(fileName);
-
-  try {
-    const { width, height } = await probe(input);
-    return { width, height };
-  } finally {
-    input.destroy();
-  }
-}
-
-function fitIntoBounds(size, bounds) {
-  let width, height;
-
-  if (size.width * bounds.height > size.height * bounds.width) {
-    width = bounds.width; // eslint-disable-line prefer-destructuring
-    height = Math.max(1, Math.round((size.height * bounds.width) / size.width));
-  } else {
-    width = Math.max(1, Math.round((size.width * bounds.height) / size.height));
-    height = bounds.height; // eslint-disable-line prefer-destructuring
-  }
-
-  return { width, height };
-}
-
-const orientationCommands = {
-  2: ['-flop'],
-  3: ['-rotate', 180],
-  4: ['-flip'],
-  5: ['-flip', '-rotate', 90],
-  6: ['-rotate', 90],
-  7: ['-flop', '-rotate', 90],
-  8: ['-rotate', 270],
-};
-
-/**
- * @param {string} fileName
- * @returns {Promise<null | string[]>}
- */
-async function gmAutoOrientCommands(fileName) {
-  const { 'IFD0:Orientation': orientation } = await exiftool.readRaw(fileName, [
-    '-IFD0:Orientation',
-    '-G1',
-    '-n',
-  ]);
-  const commands = orientationCommands[orientation];
-
-  if (!commands) {
-    return null;
-  }
-
-  return [...commands, '-page', '+0+0'];
-}
-
-/**
- * Clear all orientation tags
- *
- * @param {string} fileName
- * @returns {Promise<void>}
- */
-async function clearOrientation(fileName) {
-  const orientTags = ['IFD0:Orientation'];
-  const imageTags = await exiftool.readRaw(fileName, [
-    ...orientTags.map((t) => `-${t}`),
-    '-G1',
-    '-n',
-  ]);
-
-  const tagsToClean = {
-    // Always remove all IFD1 (preview) section
-    'IFD1:all': null,
-  };
-
-  // We do not want to change images if it is not necessary, so we ignore tag
-  // values of '1' (Normal).
-  for (const tag of orientTags) {
-    if (tag in imageTags && imageTags[tag] !== 1) {
-      tagsToClean[tag] = null;
-    }
-  }
-
-  if (Object.keys(tagsToClean).length > 0) {
-    try {
-      await exiftool.write(fileName, tagsToClean, {
-        writeArgs: ['-overwrite_original', '-ignoreMinorErrors'],
-      });
-    } catch {
-      // It's ok to fail, we cannot do anything useful in this case
-    }
-  }
 }
