@@ -3,7 +3,7 @@
   "name": "freefeed-server",
   "description": "FreeFeed is an open source FriendFeed clone (yes, it is free and open!) based on Pepyatka open-source FriendFeed clone (yes, that one is also free and open). Basically, this is a social real-time feed aggregator that allows you to share cute kittens, coordinate upcoming events, discuss any other cool stuff on the Internet or setup a private Pepyatka instance in your company.",
   "homepage": "https://freefeed.net",
-  "version": "2.23.1",
+  "version": "2.24.0",
   "private": true,
   "scripts": {
     "start": "cross-env TZ=UTC yarn babel index.js",
