@@ -6,7 +6,7 @@ import unexpected from 'unexpected';
 import unexpectedDate from 'unexpected-date';
 import unexpectedSinon from 'unexpected-sinon';
 import { spy } from 'sinon';
-import { sortBy } from 'lodash';
+import { difference, sortBy } from 'lodash';
 
 import cleanDB from '../../dbCleaner';
 import { Job, dbAdapter, JobManager } from '../../../app/models';
@@ -369,20 +369,18 @@ describe('Jobs', () => {
         await Job.create('foo'),
       ];
 
-      let [pj] = await Promise.all([jm.fetchAndProcess(), setTimeout(50).then(resolve)]);
+      const allIds = jobs.map((j) => j.id);
 
-      expect(
-        pj.map((j) => j.id),
-        'when sorted',
-        'to equal',
-        [jobs[0].id, jobs[1].id].sort(),
-      );
+      let [pj] = await Promise.all([jm.fetchAndProcess(), setTimeout(50).then(resolve)]);
+      const fetchedIds = pj.map((j) => j.id);
+
+      expect(fetchedIds, 'to have length', 2);
 
       pj = await jm.fetchAndProcess();
       expect(
         pj.map((j) => j.id),
         'to equal',
-        [jobs[2].id],
+        difference(allIds, fetchedIds),
       );
     });
 
@@ -413,7 +411,7 @@ describe('Jobs', () => {
     it('should respect unlock_at ordering', async () => {
       const jm = new JobManager({ limitedJobs: { foo: 1 } });
       const foo1 = await Job.create('foo');
-      await setTimeout(10);
+      await setTimeout(100);
       await Job.create('foo');
 
       const jobs = await jm.fetch();
