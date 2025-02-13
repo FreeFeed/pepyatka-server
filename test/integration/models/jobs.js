@@ -1,5 +1,7 @@
 /* eslint-env node, mocha */
 /* global $pg_database */
+import { setTimeout } from 'timers/promises';
+
 import unexpected from 'unexpected';
 import unexpectedDate from 'unexpected-date';
 import unexpectedSinon from 'unexpected-sinon';
@@ -131,6 +133,7 @@ describe('Jobs', () => {
 
     it('should fetch placed jobs', async () => {
       const [job1, now] = await Promise.all([Job.create('job'), dbAdapter.now()]);
+      await setTimeout(10);
       const job2 = await Job.create('job');
       const jobs = await jm.fetch();
 
@@ -190,6 +193,7 @@ describe('Jobs', () => {
         jm.on('job2', spy2);
 
         const job1 = await Job.create('job1');
+        await setTimeout(10);
         const job2 = await Job.create('job2');
 
         await jm.fetchAndProcess();
@@ -365,8 +369,7 @@ describe('Jobs', () => {
         await Job.create('foo'),
       ];
 
-      setTimeout(resolve, 50);
-      let pj = await jm.fetchAndProcess();
+      let [pj] = await Promise.all([jm.fetchAndProcess(), setTimeout(50).then(resolve)]);
 
       expect(
         pj.map((j) => j.id),
@@ -381,6 +384,141 @@ describe('Jobs', () => {
         'to equal',
         [jobs[2].id],
       );
+    });
+
+    it('should respect different limits for different job types', async () => {
+      const jm = new JobManager({ limitedJobs: { foo: 1, bar: 2 } });
+      await Promise.all([
+        Job.create('foo'),
+        Job.create('foo'),
+        Job.create('bar'),
+        Job.create('bar'),
+        Job.create('bar'),
+      ]);
+
+      const jobs = await jm.fetch();
+      expect(jobs, 'to have length', 3);
+      expect(
+        jobs.filter((j) => j.name === 'foo'),
+        'to have length',
+        1,
+      );
+      expect(
+        jobs.filter((j) => j.name === 'bar'),
+        'to have length',
+        2,
+      );
+    });
+
+    it('should respect unlock_at ordering', async () => {
+      const jm = new JobManager({ limitedJobs: { foo: 1 } });
+      const foo1 = await Job.create('foo');
+      await setTimeout(10);
+      await Job.create('foo');
+
+      const jobs = await jm.fetch();
+      expect(jobs, 'to have length', 1);
+      expect(jobs[0].id, 'to be', foo1.id);
+    });
+
+    it('should handle concurrent fetches correctly', async () => {
+      const jm1 = new JobManager({ limitedJobs: { foo: 2 } });
+      const jm2 = new JobManager({ limitedJobs: { foo: 2 } });
+
+      await Promise.all([
+        Job.create('foo'),
+        Job.create('foo'),
+        Job.create('foo'),
+        Job.create('foo'),
+      ]);
+
+      const [batch1, batch2] = await Promise.all([jm1.fetch(), jm2.fetch()]);
+
+      expect(batch1.length + batch2.length, 'to be', 2);
+      const allIds = [...batch1, ...batch2].map((j) => j.id);
+      expect(allIds, 'to have length', 2);
+      expect(new Set(allIds).size, 'to be', 2); // all ids should be unique
+    });
+
+    it('should correctly handle mix of limited and unlimited jobs', async () => {
+      const jm = new JobManager({ batchSize: 4, limitedJobs: { foo: 1, bar: 2 } });
+
+      await Promise.all([
+        Job.create('foo'),
+        Job.create('foo'),
+        Job.create('bar'),
+        Job.create('bar'),
+        Job.create('unlimited'),
+        Job.create('unlimited'),
+      ]);
+
+      const fetched = await jm.fetch();
+      expect(fetched, 'to have length', 4);
+      expect(
+        fetched.filter((j) => j.name === 'foo'),
+        'to have length',
+        1,
+      );
+      expect(
+        fetched.filter((j) => j.name === 'bar'),
+        'to have length',
+        2,
+      );
+      expect(
+        fetched.filter((j) => j.name === 'unlimited'),
+        'to have length',
+        1,
+      );
+    });
+
+    it('should count currently locked jobs towards limits', async () => {
+      const jm1 = new JobManager({ limitedJobs: { foo: 2 } });
+      const jm2 = new JobManager({ limitedJobs: { foo: 2 } });
+
+      await Promise.all([Job.create('foo'), Job.create('foo'), Job.create('foo')]);
+
+      const batch1 = await jm1.fetch();
+      expect(batch1, 'to have length', 2);
+
+      const batch2 = await jm2.fetch();
+      expect(batch2, 'to have length', 0);
+    });
+
+    it('should respect count parameter regardless of limits', async () => {
+      const jm = new JobManager({ limitedJobs: { foo: 5, bar: 5 } });
+
+      await Promise.all([
+        Job.create('foo'),
+        Job.create('foo'),
+        Job.create('bar'),
+        Job.create('bar'),
+        Job.create('unlimited'),
+      ]);
+
+      const jobs = await jm.fetch(2); // fetch only 2 jobs
+      expect(jobs, 'to have length', 2);
+    });
+
+    it('should handle rapid sequential fetches correctly', async () => {
+      const jm = new JobManager({ limitedJobs: { foo: 2 } });
+
+      // Create 4 jobs
+      await Promise.all([
+        Job.create('foo'),
+        Job.create('foo'),
+        Job.create('foo'),
+        Job.create('foo'),
+      ]);
+
+      // Rapid sequential fetches without waiting for the first one to complete
+      const [batch1, batch2, batch3] = await Promise.all([jm.fetch(), jm.fetch(), jm.fetch()]);
+
+      // We should get exactly 2 jobs in total (limit: 2)
+      expect(batch1.length + batch2.length + batch3.length, 'to be', 2);
+
+      // All received jobs should be unique
+      const allIds = [...batch1, ...batch2, ...batch3].map((j) => j.id);
+      expect(new Set(allIds).size, 'to be', 2);
     });
   });
 });

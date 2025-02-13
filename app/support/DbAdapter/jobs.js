@@ -71,42 +71,52 @@ export default function jobsTrait(superClass) {
         // Case with limited jobs
         rows = await this.database.getAll(
           `with
-          -- Get remaining limits for each limited job
-          limits_remaining as (
-            select
-              lj.name, -- limited job name
-              lj.lim - coalesce(count(j.id), 0) as remaining -- remaining limit
-            from
-              jsonb_to_recordset(:limData) as lj(name text, lim int)
-              left join jobs j on 
-                lj.name = j.name
-                and j.unlock_at > now() -- already taken jobs
-            group by lj.name, lj.lim
+          -- Parse job limits from input JSON
+          limits as (
+              select name, lim
+              from jsonb_to_recordset(:limData) as x(name text, lim int)
           ),
-          -- Get jobs to process, with ordered number by each job name
-          job_candidates as (
-            select id, name, unlock_at,
-              row_number() over (partition by name order by unlock_at) as row_num
-            from jobs
-            where unlock_at <= now()
+          -- Count currently locked jobs for each job type
+          locked_counts as (
+              select name, count(*) as locked_count
+              from jobs
+              where unlock_at > now()
+              group by name
           ),
-          -- Select jobs to process, no more than remaining limit for limited jobs
+          -- Get available jobs and lock them immediately
+          lockable_jobs as (
+              select id, name, unlock_at
+              from jobs
+              where unlock_at <= now()
+              for update skip locked
+          ),
+          -- Number locked jobs within each job type
+          numbered_jobs as (
+              select 
+                  id, 
+                  name,
+                  unlock_at,
+                  row_number() over (partition by name) as row_num
+              from lockable_jobs
+          ),
+          -- Select jobs respecting limits and max count
           selected_jobs as (
-            select j.* from
-              job_candidates j
-              left join limits_remaining r on j.name = r.name
-            where r.remaining is null
-              or r.remaining >= j.row_num
-            order by j.unlock_at
-            limit :count
-            for update skip locked
+              select j.id
+              from numbered_jobs j
+              left join limits l on j.name = l.name
+              left join locked_counts lc on j.name = lc.name
+              where 
+                  l.name is null -- no limits for this job type
+                  or j.row_num + coalesce(lc.locked_count, 0) <= l.lim -- within limits
+              order by j.unlock_at
+              limit :count
           )
-        -- Update selected jobs
-        update jobs set
-          unlock_at = now() + :lockTime * '1 second'::interval,
-          attempts = attempts + 1
-        where id = any(select id from selected_jobs)
-        returning *`,
+          -- Update selected jobs with new unlock time
+          update jobs
+          set unlock_at = now() + :lockTime * '1 second'::interval,
+              attempts = attempts + 1
+          where id in (select id from selected_jobs)
+          returning *`,
           { count, lockTime, limData: JSON.stringify(limData) },
         );
       }
