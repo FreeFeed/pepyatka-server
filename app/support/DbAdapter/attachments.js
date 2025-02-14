@@ -9,6 +9,9 @@ import { initObject, prepareModelPayload } from './utils';
 // Attachments
 ///////////////////////////////////////////////////
 
+const cacheVersion = 2;
+const cacheTTL = 3 * 60 * 60; // 3 hours
+
 const attachmentsTrait = (superClass) =>
   class extends superClass {
     async createAttachment(payload) {
@@ -174,7 +177,7 @@ const attachmentsTrait = (superClass) =>
         });
 
         if (data) {
-          await this.cache.set(key, data);
+          await this.cache.set(key, data, cacheTTL);
         }
       }
 
@@ -195,7 +198,9 @@ const attachmentsTrait = (superClass) =>
 
         if (missedIds.length > 0) {
           const missedData = await this.database('attachments').whereIn('uid', missedIds);
-          await Promise.all(missedData.map((attrs) => this.cache.set(cacheKey(attrs.uid), attrs)));
+          await Promise.all(
+            missedData.map((attrs) => this.cache.set(cacheKey(attrs.uid), attrs, cacheTTL)),
+          );
 
           for (let i = 0; i < data.length; i++) {
             if (data[i]) {
@@ -329,8 +334,6 @@ const ATTACHMENT_FIELDS_MAPPING = {
     return typeof updated_at === 'string' ? new Date(updated_at) : updated_at;
   },
 };
-
-const cacheVersion = 1;
 
 function cacheKey(attId) {
   return `attachment_${cacheVersion}_${attId}`;
