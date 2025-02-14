@@ -159,6 +159,11 @@ config.attachments = {
   url: defer((cfg) => cfg.media.url),
   storage: defer((cfg) => cfg.media.storage),
   path: 'attachments/', // must have trailing slash
+  // Temporary directory for delayed media files processing. Leave null to use default uploaded
+  // files location. It should not be null in multi-container mode. In that case this directory
+  // should be shared with other containers and the media files will be moved to this directory
+  // before delayed processing.
+  sharedMediaDir: null,
   fileSizeLimitByType: {
     // Limits for each file type
     video: 500 * 1024 * 1024,

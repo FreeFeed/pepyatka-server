@@ -126,6 +126,8 @@ export function addModel(dbAdapter) {
     }
 
     static async create(filePath, fileName, user, postId = null) {
+      const attCfg = currentConfig().attachments;
+
       let sanitized = SANITIZE_NONE;
 
       if (user.preferences.sanitizeMediaMetadata) {
@@ -137,7 +139,7 @@ export function addModel(dbAdapter) {
 
       if (mediaData.meta?.inProgress) {
         // How many of user's media are currently being processed?
-        const limit = currentConfig().attachments.userMediaProcessingLimit;
+        const limit = attCfg.userMediaProcessingLimit;
         const inProgressMedia = await dbAdapter.getInProgressAttachmentsNumber(user.id);
 
         if (inProgressMedia >= limit) {
@@ -166,8 +168,16 @@ export function addModel(dbAdapter) {
       const object = await dbAdapter.getAttachmentById(id);
 
       if (object.meta.inProgress) {
+        let origPath = files['original'].path;
+
+        if (attCfg.sharedMediaDir) {
+          origPath = join(attCfg.sharedMediaDir, `${id}.orig`);
+          debug(`moving ${files['original'].path} to ${origPath} for further processing`);
+          await mvAsync(files['original'].path, origPath);
+        }
+
         debug(`creating ATTACHMENT_PREPARE_VIDEO job for ${id}`);
-        await createPrepareVideoJob({ attId: id, filePath: files['original'].path });
+        await createPrepareVideoJob({ attId: id, filePath: origPath });
         delete files['original'];
       }
 
@@ -255,8 +265,8 @@ export function addModel(dbAdapter) {
      * @returns {Promise<void>}
      */
     async _placeFiles(files) {
-      debug(`placing files for ${this.id} to ${storageConfig.type}`, files);
       const storageConfig = currentConfig().attachments.storage;
+      debug(`placing files for ${this.id} to ${storageConfig.type}`, files);
       await Promise.all(
         Object.entries(files).map(async ([variant, { path, ext }]) => {
           if (storageConfig.type === 's3') {
