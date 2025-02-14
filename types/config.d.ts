@@ -27,6 +27,7 @@ declare module 'config' {
       url: string;
       storage: MediaStorage;
       path: string;
+      sharedMediaDir: string | null;
       fileSizeLimit: number;
       fileSizeLimitByType: {
         image?: number;

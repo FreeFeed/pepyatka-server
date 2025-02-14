@@ -126,6 +126,8 @@ export function addModel(dbAdapter) {
     }
 
     static async create(filePath, fileName, user, postId = null) {
+      const attCfg = currentConfig().attachments;
+
       let sanitized = SANITIZE_NONE;
 
       if (user.preferences.sanitizeMediaMetadata) {
@@ -137,11 +139,14 @@ export function addModel(dbAdapter) {
 
       if (mediaData.meta?.inProgress) {
         // How many of user's media are currently being processed?
-        const limit = currentConfig().attachments.userMediaProcessingLimit;
+        const limit = attCfg.userMediaProcessingLimit;
         const inProgressMedia = await dbAdapter.getInProgressAttachmentsNumber(user.id);
 
         if (inProgressMedia >= limit) {
           // User has too many media in progress, don't process any more
+          debug(
+            `user ${user.id} has too many attachments in progress, aborting the ${filePath} processing`,
+          );
           await Promise.all(Object.values(files).map((file) => fs.unlink(file.path)));
 
           throw new TooManyRequestsException(
@@ -163,7 +168,16 @@ export function addModel(dbAdapter) {
       const object = await dbAdapter.getAttachmentById(id);
 
       if (object.meta.inProgress) {
-        await createPrepareVideoJob({ attId: id, filePath: files['original'].path });
+        let origPath = files['original'].path;
+
+        if (attCfg.sharedMediaDir) {
+          origPath = join(attCfg.sharedMediaDir, `${id}.orig`);
+          debug(`moving ${files['original'].path} to ${origPath} for further processing`);
+          await mvAsync(files['original'].path, origPath);
+        }
+
+        debug(`creating ATTACHMENT_PREPARE_VIDEO job for ${id}`);
+        await createPrepareVideoJob({ attId: id, filePath: origPath });
         delete files['original'];
       }
 
@@ -185,12 +199,15 @@ export function addModel(dbAdapter) {
      * @returns {Promise<void>}
      */
     async finalizeCreation(filePath) {
+      debug(`finalizing creation of ${this.id}`);
+
       try {
         const { files = {}, ...mediaData } = await processMediaFile(filePath, this.fileName, {
           synchronous: true,
         });
 
         if (!files['']) {
+          debug(`no original file to upload (${this.id})`);
           throw new Error('No original file to upload');
         }
 
@@ -249,6 +266,7 @@ export function addModel(dbAdapter) {
      */
     async _placeFiles(files) {
       const storageConfig = currentConfig().attachments.storage;
+      debug(`placing files for ${this.id} to ${storageConfig.type}`, files);
       await Promise.all(
         Object.entries(files).map(async ([variant, { path, ext }]) => {
           if (storageConfig.type === 's3') {

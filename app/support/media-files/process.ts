@@ -2,6 +2,7 @@ import { stat, unlink, writeFile } from 'fs/promises';
 
 import { lookup as mimeLookup } from 'mime-types';
 import { exiftool } from 'exiftool-vendored';
+import createDebug from 'debug';
 
 import { spawnAsync, SpawnAsyncArgs } from '../spawn-async';
 import { currentConfig } from '../app-async-context';
@@ -28,6 +29,8 @@ type FileProps = {
   mimeType: string;
 };
 
+const debug = createDebug('freefeed:model:attachment:process');
+
 /**
  * Process media file:
  * 1. Detect media type
@@ -43,6 +46,7 @@ export async function processMediaFile(
   } = {},
 ): Promise<MediaProcessResult> {
   const info = await detectMediaType(localFilePath, origFileName);
+  debug(`detected media type '${info.type}' for ${localFilePath} (${origFileName})`, info);
 
   const commonResult = {
     ...(await fileProps(localFilePath, origFileName, info.extension)),
@@ -59,6 +63,7 @@ export async function processMediaFile(
     const sizeLimit = limits[type] ?? limits['default'];
 
     if (commonResult.fileSize > sizeLimit) {
+      debug(`file size ${commonResult.fileSize} is too large for ${type} (${localFilePath})`);
       throw new ContentTooLargeException(
         `This '${type}' file is too large (the maximum size is ${sizeLimit} bytes)`,
       );
@@ -123,6 +128,7 @@ export async function processMediaFile(
 
     if (!info.isAnimatedImage && !synchronous) {
       // Truly video, should create processing task
+      debug(`scheduling video processing for ${localFilePath} (${origFileName})`);
       const stubContent = 'This file is being processed.';
       const stubFilePath = tmpFileVariant(localFilePath, '', 'tmp');
       await writeFile(stubFilePath, stubContent);
@@ -188,6 +194,8 @@ async function processImage(
   isVideoStill = false,
 ): Promise<[VisualPreviews, FilesToUpload]> {
   const previewSizes = getImagePreviewSizes(info);
+
+  debug(`image preview sizes for ${localFilePath}`, previewSizes);
 
   // Now we should create all the previews
 
@@ -270,6 +278,7 @@ async function processAudio(
     (info.format === 'mov' && info.aCodec === 'aac')
   ) {
     // We don't need to generate previews for mp3 and m4a audio files
+    debug(`skipping audio preview generation for ${localFilePath}`);
     previews[''] = { ext: info.extension };
     return [previews, filesToUpload];
   }
@@ -278,6 +287,8 @@ async function processAudio(
   const ext = info.aCodec === 'mp3' ? 'mp3' : 'm4a';
   const fmt = info.aCodec === 'mp3' ? 'mp3' : 'mp4';
   const outFile = tmpFileVariant(localFilePath, variant, ext);
+
+  debug(`converting ${localFilePath} audio to ${outFile}`);
 
   const commands = [];
 
@@ -319,7 +330,13 @@ async function processVideo(
 ): Promise<[{ video: VisualPreviews; image: VisualPreviews }, FilesToUpload]> {
   const previewSizes = getVideoPreviewSizes(info);
 
+  debug(`video preview sizes for ${localFilePath}`, previewSizes);
+
   const keepOriginalFile = info.isAnimatedImage === true;
+
+  if (keepOriginalFile) {
+    debug(`keeping original file for ${localFilePath}`);
+  }
 
   const [maxPreviewSize] = previewSizes;
   const maxVariant = maxPreviewSize.variant;
@@ -443,6 +460,8 @@ async function processVideo(
     };
   }
 
+  debug(`starting video conversion for ${localFilePath}`);
+  const tStart = Date.now();
   await spawnAsync('ffmpeg', [
     '-hide_banner',
     ['-loglevel', 'error'],
@@ -450,7 +469,11 @@ async function processVideo(
     ['-filter_complex', filters.join(';')],
     ...commands,
   ]);
+  debug(
+    `finished video conversion for ${localFilePath} in ${Math.round((Date.now() - tStart) / 1000)}s`,
+  );
 
+  debug(`processing still frame for ${localFilePath} as ${stillFile}`);
   const [imagePreviews, imageFiles] = await processImage(
     {
       type: 'image',
@@ -464,6 +487,7 @@ async function processVideo(
   );
 
   if (!keepOriginalFile) {
+    debug(`removing original file for ${localFilePath}`);
     await unlink(localFilePath);
 
     videoPreviews[''] = videoPreviews[maxVariant];

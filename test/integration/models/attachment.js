@@ -727,6 +727,65 @@ describe('Attachments', () => {
       });
       expect(att.meta, 'to equal', { animatedImage: true, silent: true });
     });
+
+    describe('The sharedMediaDir config option', () => {
+      withModifiedConfig(() => {
+        // Just reuse tmpdir
+        return { attachments: { sharedMediaDir: tmpdir() } };
+      });
+
+      it('should create a small h264 video attachment', async () => {
+        const att = await createAttachment(testFiles.mov, post, user);
+        // At first, we should have a stub file
+        expect(att, 'to satisfy', {
+          mediaType: 'video',
+          fileName: 'test-quicktime-video.tmp',
+          fileExtension: 'tmp',
+          mimeType: 'text/plain',
+          fileSize: 29,
+          previews: expect.it('to equal', {}),
+          meta: expect.it('to equal', { silent: true, inProgress: true }),
+          width: 1572,
+          height: 710,
+          duration: 2.9815,
+        });
+
+        // Now execute the job
+        await jobManager.fetchAndProcess();
+
+        // The video should have been processed
+        const att2 = await dbAdapter.getAttachmentById(att.id);
+        expect(att2, 'to satisfy', {
+          mediaType: 'video',
+          fileName: 'test-quicktime-video.mp4',
+          fileExtension: 'mp4',
+          mimeType: 'video/mp4',
+          previews: expect.it('to equal', {
+            video: {
+              '': { h: 710, w: 1572, ext: 'mp4' },
+              v1: { h: 480, w: 1062, ext: 'mp4' },
+            },
+            image: {
+              p1: { h: 233, w: 515, ext: 'webp' },
+              p2: { h: 425, w: 941, ext: 'webp' },
+              p3: { h: 710, w: 1572, ext: 'webp' },
+              thumbnails: { h: 175, w: 387, ext: 'webp' },
+              thumbnails2: { h: 350, w: 775, ext: 'webp' },
+            },
+          }),
+          meta: expect.it('to equal', { silent: true }),
+          width: 1572,
+          height: 710,
+          duration: 2.9815,
+        });
+
+        // All files should exist
+        await checkAttachmentFiles(att2);
+
+        // The stub file should have been deleted
+        await filesMustExist(att, false);
+      });
+    });
   });
 
   describe('Async processing limits', () => {
