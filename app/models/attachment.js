@@ -142,6 +142,9 @@ export function addModel(dbAdapter) {
 
         if (inProgressMedia >= limit) {
           // User has too many media in progress, don't process any more
+          debug(
+            `user ${user.id} has too many attachments in progress, aborting the ${filePath} processing`,
+          );
           await Promise.all(Object.values(files).map((file) => fs.unlink(file.path)));
 
           throw new TooManyRequestsException(
@@ -163,6 +166,7 @@ export function addModel(dbAdapter) {
       const object = await dbAdapter.getAttachmentById(id);
 
       if (object.meta.inProgress) {
+        debug(`creating ATTACHMENT_PREPARE_VIDEO job for ${id}`);
         await createPrepareVideoJob({ attId: id, filePath: files['original'].path });
         delete files['original'];
       }
@@ -185,12 +189,15 @@ export function addModel(dbAdapter) {
      * @returns {Promise<void>}
      */
     async finalizeCreation(filePath) {
+      debug(`finalizing creation of ${this.id}`);
+
       try {
         const { files = {}, ...mediaData } = await processMediaFile(filePath, this.fileName, {
           synchronous: true,
         });
 
         if (!files['']) {
+          debug(`no original file to upload (${this.id})`);
           throw new Error('No original file to upload');
         }
 
@@ -248,6 +255,7 @@ export function addModel(dbAdapter) {
      * @returns {Promise<void>}
      */
     async _placeFiles(files) {
+      debug(`placing files for ${this.id} to ${storageConfig.type}`, files);
       const storageConfig = currentConfig().attachments.storage;
       await Promise.all(
         Object.entries(files).map(async ([variant, { path, ext }]) => {

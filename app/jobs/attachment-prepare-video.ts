@@ -55,6 +55,7 @@ async function keepJobLocked(job: Job, interval: number, abortSignal: AbortSigna
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for await (const _ of setInterval(interval, null, { signal: abortSignal })) {
+    debug(`${ATTACHMENT_PREPARE_VIDEO}: re-locking the job ${job.id}`);
     await job.setUnlockAt(interval * 1.5);
   }
 }

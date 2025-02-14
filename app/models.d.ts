@@ -268,6 +268,7 @@ type JobParams = {
 };
 
 export class Job<T = unknown> {
+  id: UUID;
   name: string;
   payload: T;
   attempts: number;
