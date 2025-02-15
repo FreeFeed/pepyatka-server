@@ -95,8 +95,12 @@ export function addModel(dbAdapter) {
           result.image[variant] = {
             w: entry.w,
             h: entry.h,
-            ext: entry.url.split('.').pop(),
+            ext: entry.url?.split('.').pop(),
           };
+
+          if (!entry.url) {
+            debug(`no URL for image size ${variant} of attachment ${this.id}`, this._imageSizes);
+          }
         }
       }
 
