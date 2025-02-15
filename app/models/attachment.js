@@ -20,6 +20,7 @@ import { TooManyRequestsException } from '../support/exceptions';
 const mvAsync = util.promisify(mv);
 
 const debug = createDebug('freefeed:model:attachment');
+const debugError = createDebug('freefeed:model:attachment:error');
 
 export function addModel(dbAdapter) {
   return class Attachment {
@@ -95,8 +96,15 @@ export function addModel(dbAdapter) {
           result.image[variant] = {
             w: entry.w,
             h: entry.h,
-            ext: entry.url.split('.').pop(),
+            ext: entry.url?.split('.').pop(),
           };
+
+          if (!entry.url) {
+            debugError(
+              `no URL for image size ${variant} of attachment ${this.id}`,
+              this._imageSizes,
+            );
+          }
         }
       }
 
@@ -144,7 +152,7 @@ export function addModel(dbAdapter) {
 
         if (inProgressMedia >= limit) {
           // User has too many media in progress, don't process any more
-          debug(
+          debugError(
             `user ${user.id} has too many attachments in progress, aborting the ${filePath} processing`,
           );
           await Promise.all(Object.values(files).map((file) => fs.unlink(file.path)));
@@ -207,7 +215,7 @@ export function addModel(dbAdapter) {
         });
 
         if (!files['']) {
-          debug(`no original file to upload (${this.id})`);
+          debugError(`no original file to upload (${this.id})`);
           throw new Error('No original file to upload');
         }
 
@@ -220,7 +228,7 @@ export function addModel(dbAdapter) {
         // Update data
         await dbAdapter.updateAttachment(this.id, { ...mediaData, updatedAt: 'now' });
       } catch (err) {
-        debug(`finalizeCreation error: ${err.message}, treat file as 'general' type`);
+        debugError(`finalizeCreation error: ${err.message}, treat file as 'general' type`);
 
         const { size: fileSize } = await fs.stat(filePath);
         const ext = extname(this.fileName)
@@ -484,7 +492,7 @@ export function addModel(dbAdapter) {
         } catch (err) {
           // Exiftool is failed, so the file was not updated and we cannot do
           // anymore here
-          debug(`sanitizeOriginal: cannot sanitize attachment ${this.id}: ${err.message}`);
+          debugError(`sanitizeOriginal: cannot sanitize attachment ${this.id}: ${err.message}`);
           Raven.captureException(err, {
             extra: {
               err: `sanitizeOriginal: cannot sanitize attachment ${this.id}`,
@@ -536,7 +544,7 @@ export function addModel(dbAdapter) {
           await fs.unlink(localFile);
         } catch (err) {
           if (err.code !== 'ENOENT') {
-            debug(`sanitizeOriginal: cannot remove temporary file: ${localFile}`);
+            debugError(`sanitizeOriginal: cannot remove temporary file: ${localFile}`);
             Raven.captureException(err, {
               extra: { err: `sanitizeOriginal: cannot remove temporary file: ${localFile}` },
             });
