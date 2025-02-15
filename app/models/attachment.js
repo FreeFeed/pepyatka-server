@@ -96,15 +96,10 @@ export function addModel(dbAdapter) {
           result.image[variant] = {
             w: entry.w,
             h: entry.h,
-            ext: entry.url?.split('.').pop(),
+            // There are some old attachments without the 'url' field here. Use
+            // the file extension as a fallback.
+            ext: entry.url?.split('.').pop() ?? this.fileExtension,
           };
-
-          if (!entry.url) {
-            debugError(
-              `no URL for image size ${variant} of attachment ${this.id}`,
-              this._imageSizes,
-            );
-          }
         }
       }
 
