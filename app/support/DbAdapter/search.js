@@ -576,7 +576,7 @@ function intervalSQL(token, field) {
   return 'false';
 }
 
-const commonFileTypes = ['audio', 'image', 'general'];
+const commonFileTypes = ['audio', 'image', 'video', 'general'];
 /**
  * Returns aggregated List of file types used in 'has:' conditions. Returns null
  * if none of such conditions present.

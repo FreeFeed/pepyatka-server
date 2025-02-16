@@ -34,7 +34,7 @@ Some operators takes user name as an arguments. In such operators you can use a 
 * liked-by:
 * cliked-by:
 * to:
-* has:
+* has: / with:
 * is:
 * comments: *(interval)*
 * likes: *(interval)*
@@ -120,7 +120,7 @@ Since `cliked-by:` makes sense only for comments, it switches the search scope t
 
 **is:private,protected** limits search to posts with the specified visibility. These are `private`, `protected` and `public`.
 
-**has:images,audio** limits search to posts with files of the specified type. You can specify the concrete file type (only `images` or `audio` for now), or search for any files using the `has:files` form. You can also specify the file extension, for example `has:mp3` will search for files with the `mp3` extension.
+**has:images,audio** limits search to posts with files of the specified type. It has a **with:** alias. You can specify the concrete file type (`images`, `audio` or `video`), or search for any files using the `has:files` form. You can also specify the file extension, for example `has:mp3` will search for files with the `mp3` extension.
 
 **comments:*(interval)*** limits search to posts with the specified number of comments.
 

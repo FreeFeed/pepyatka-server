@@ -158,9 +158,10 @@ export function parseQuery(query: string, { minPrefixLength }: ParseQueryOptions
       }
 
       // has:images,audio, has:jpg or has:.jpg
+      // `with:` is an alias for `has:`
       if (groups.cond === 'has') {
         const words = (groups.word as string).split(',').map((w) => {
-          if (/^images?|audios?|files?$/.test(w)) {
+          if (/^(image|audio|video|file)s?$/.test(w)) {
             return w.replace(/s$/g, '');
           }
 

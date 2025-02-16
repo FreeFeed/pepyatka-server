@@ -138,7 +138,9 @@ export function addModel(dbAdapter) {
         sanitized = SANITIZE_VERSION;
       }
 
+      const startTime = Date.now();
       const { files = {}, ...mediaData } = await processMediaFile(filePath, fileName);
+      const processTime = (Date.now() - startTime) / 1000;
 
       if (mediaData.meta?.inProgress) {
         // How many of user's media are currently being processed?
@@ -156,6 +158,16 @@ export function addModel(dbAdapter) {
             `You cannot process more than ${limit} media files at the same time. Please try again later.`,
           );
         }
+      } else {
+        // Only count attachments that are not in progress. The ones in progress
+        // will be counted in the finalizeCreation() method.
+        const statTags = {
+          mediaType: mediaData.mediaType,
+          mimeType: mediaData.mimeType,
+        };
+        monitor.increment('attachments.count', 1, statTags);
+        monitor.increment('attachments.process-time', processTime, statTags);
+        monitor.increment('attachments.size', mediaData.fileSize, statTags);
       }
 
       // Save record to DB
@@ -204,10 +216,14 @@ export function addModel(dbAdapter) {
     async finalizeCreation(filePath) {
       debug(`finalizing creation of ${this.id}`);
 
+      let processTime = 0;
+
       try {
+        const startTime = Date.now();
         const { files = {}, ...mediaData } = await processMediaFile(filePath, this.fileName, {
           synchronous: true,
         });
+        processTime = (Date.now() - startTime) / 1000;
 
         if (!files['']) {
           debugError(`no original file to upload (${this.id})`);
@@ -251,6 +267,16 @@ export function addModel(dbAdapter) {
           duration: null,
         };
         await dbAdapter.updateAttachment(this.id, toUpdate);
+      }
+
+      {
+        const statTags = {
+          mediaType: this.mediaType,
+          mimeType: this.mimeType,
+        };
+        monitor.increment('attachments.count', 1, statTags);
+        monitor.increment('attachments.process-time', processTime, statTags);
+        monitor.increment('attachments.size', this.fileSize, statTags);
       }
 
       // Realtime events
