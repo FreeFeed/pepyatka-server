@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.24.0] - Not released
+### Fixed
+- Fix the case when the uploaded video original is for some reason missing at
+  the time of the _finalizeCreation_ call.
 
 ## [2.23.6] - 2025-02-16
 ### Added

@@ -16,6 +16,7 @@ import { currentConfig } from '../support/app-async-context';
 import { createPrepareVideoJob } from '../jobs/attachment-prepare-video';
 import { PubSub as pubSub } from '../models';
 import { TooManyRequestsException } from '../support/exceptions';
+import { setExtension } from '../support/media-files/file-ext';
 
 const mvAsync = util.promisify(mv);
 
@@ -216,6 +217,11 @@ export function addModel(dbAdapter) {
     async finalizeCreation(filePath) {
       debug(`finalizing creation of ${this.id}`);
 
+      if (!this.meta.inProgress) {
+        debugError(`attachment ${this.id} is already finalized, aborting`);
+        return;
+      }
+
       let processTime = 0;
 
       try {
@@ -239,10 +245,25 @@ export function addModel(dbAdapter) {
         // Update data
         await dbAdapter.updateAttachment(this.id, { ...mediaData, updatedAt: 'now' });
       } catch (err) {
-        debugError(`finalizeCreation error: ${err.message}, treat file as 'general' type`);
+        debugError(
+          `finalizeCreation error for ${this.id}: ${err.message}, treat file as 'general' type`,
+        );
 
-        const { size: fileSize } = await fs.stat(filePath);
-        const ext = extname(this.fileName)
+        let fileSize = null;
+        let { fileName } = this;
+
+        try {
+          const st = await fs.stat(filePath);
+          fileSize = st.size;
+        } catch {
+          debugError(`file ${filePath} doesn't exist anymore, creating a stab`);
+          const stubContent = 'The original file was lost';
+          await fs.writeFile(filePath, stubContent);
+          fileSize = Buffer.byteLength(stubContent);
+          fileName = setExtension(fileName, 'txt');
+        }
+
+        const ext = extname(fileName)
           .toLowerCase()
           .replace(/[^a-z0-9_]/g, '') // Only the restricted set of chars is allowed
           .slice(0, 6); // Limit the length of the extension
