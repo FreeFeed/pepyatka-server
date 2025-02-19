@@ -804,6 +804,43 @@ describe('Attachments', () => {
       await expect(createAttachment(testFiles.mov, post, user), 'to be fulfilled');
     });
   });
+
+  describe('Recreate previews for old-style attachments', () => {
+    it('should recreate previews for old-style attachments', async () => {
+      const { id } = await createAndCheckAttachment(testFiles.large, post, user);
+      await dbAdapter.updateAttachment(id, {
+        previews: null,
+        width: null,
+        height: null,
+        imageSizes: {
+          o: { w: 1500, h: 1000, url: `https://example.com/attachments/${id}.png` },
+          t: { w: 263, h: 175, url: `https://example.com/attachments/thumbnails/${id}.png` },
+          t2: { w: 525, h: 350, url: `https://example.com/attachments/thumbnails2/${id}.png` },
+        },
+      });
+      const att = await dbAdapter.getAttachmentById(id);
+      await att.recreatePreviews();
+      const row = await dbAdapter.database.getRow(`select * from attachments where uid = :id`, {
+        id,
+      });
+
+      expect(row, 'to satisfy', {
+        previews: {
+          image: {
+            '': { h: 1000, w: 1500, ext: 'png' },
+            p1: { h: 283, w: 424, ext: 'webp' },
+            p2: { h: 516, w: 775, ext: 'webp' },
+            // Should not be replaced by webp
+            thumbnails: { h: 175, w: 263, ext: 'png' },
+            thumbnails2: { h: 350, w: 525, ext: 'png' },
+          },
+        },
+        width: 1500,
+        height: 1000,
+        image_sizes: null,
+      });
+    });
+  });
 });
 
 async function uploadFile(fileObject) {

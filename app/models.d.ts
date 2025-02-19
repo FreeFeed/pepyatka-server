@@ -227,6 +227,7 @@ export class Attachment {
   maxSizedVariant(mediaType: 'image' | 'video'): string | null;
   downloadOriginal(): Promise<string>;
   sanitizeOriginal(): Promise<boolean>;
+  recreatePreviews(): Promise<boolean>;
   destroy(destroyedBy?: User): Promise<void>;
 }
 

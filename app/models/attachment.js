@@ -309,6 +309,75 @@ export function addModel(dbAdapter) {
     }
 
     /**
+     * Re-create previews for this attachment. The image original is downloaded
+     * from the storage and all previews are generated from scratch. Next, old
+     * previews are deleted and new ones are uploaded. The updated attachment
+     * props are updated in the DB.
+     *
+     * This method is useful for re-encoding of the old attachments, that have
+     * 'image_sizes' field instead of 'previews'.
+     *
+     * Only the 'image' type (and not SVG or animated GIF) is supported at the
+     * moment.
+     *
+     * @returns {Promise<void>}
+     */
+    async recreatePreviews() {
+      if (this.mediaType !== 'image' || this.fileExtension === 'svg') {
+        throw new Error('Unsupported media type');
+      }
+
+      const originalPath = await this.downloadOriginal();
+      const { files = {}, ...mediaData } = await processMediaFile(originalPath, this.fileName);
+
+      try {
+        if (mediaData.mediaType !== 'image') {
+          // It may happen if the original file is an animated gif
+          throw new Error(
+            `The resulting media type is not an image (got '${mediaData.mediaType}')`,
+          );
+        }
+
+        // We may already have some previews. We need to keep them (to keep all
+        // possible existing links) and don't delete or even replace them. We
+        // also shouldn't re-upload the original file.
+        const filesToUpload = {};
+
+        for (const [variant, info] of Object.entries(files)) {
+          if (this.previews.image[variant]) {
+            // This variant already exists, keep it as is
+            mediaData.previews.image[variant] = this.previews.image[variant];
+          } else if (variant === '') {
+            // Skip the original
+          } else {
+            filesToUpload[variant] = info;
+          }
+        }
+
+        await this._placeFiles(filesToUpload);
+        await dbAdapter.updateAttachment(this.id, {
+          ...mediaData,
+          imageSizes: null,
+          updatedAt: 'now',
+        });
+      } finally {
+        // Remove the rest of local files
+        const paths = [originalPath, ...Object.values(files).map(({ path }) => path)];
+        await Promise.all(
+          paths.map((path) => {
+            try {
+              fs.unlink(path);
+            } catch (err) {
+              if (err.code !== 'ENOENT') {
+                throw err;
+              }
+            }
+          }),
+        );
+      }
+    }
+
+    /**
      * Upload or move processed files (original or previews)
      *
      * @param {import('../support/media-files/types').FilesToUpload} files
