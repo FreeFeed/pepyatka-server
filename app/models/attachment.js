@@ -17,6 +17,7 @@ import { createPrepareVideoJob } from '../jobs/attachment-prepare-video';
 import { PubSub as pubSub } from '../models';
 import { TooManyRequestsException } from '../support/exceptions';
 import { setExtension } from '../support/media-files/file-ext';
+import { unlinkIfExists } from '../support/unlink-if-exists';
 
 const mvAsync = util.promisify(mv);
 
@@ -363,17 +364,7 @@ export function addModel(dbAdapter) {
       } finally {
         // Remove the rest of local files
         const paths = [originalPath, ...Object.values(files).map(({ path }) => path)];
-        await Promise.all(
-          paths.map((path) => {
-            try {
-              fs.unlink(path);
-            } catch (err) {
-              if (err.code !== 'ENOENT') {
-                throw err;
-              }
-            }
-          }),
-        );
+        await Promise.all(paths.map((path) => unlinkIfExists(path)));
       }
     }
 
@@ -544,16 +535,7 @@ export function addModel(dbAdapter) {
         );
       } else {
         await Promise.all(
-          this.allRelFilePaths().map(async (path) => {
-            try {
-              await fs.unlink(storageConfig.rootDir + path);
-            } catch (err) {
-              // It is ok if file isn't found
-              if (err.code !== 'ENOENT') {
-                throw err;
-              }
-            }
-          }),
+          this.allRelFilePaths().map((path) => unlinkIfExists(storageConfig.rootDir + path)),
         );
       }
     }
@@ -652,14 +634,12 @@ export function addModel(dbAdapter) {
         return true;
       } finally {
         try {
-          await fs.unlink(localFile);
+          await unlinkIfExists(localFile);
         } catch (err) {
-          if (err.code !== 'ENOENT') {
-            debugError(`sanitizeOriginal: cannot remove temporary file: ${localFile}`);
-            Raven.captureException(err, {
-              extra: { err: `sanitizeOriginal: cannot remove temporary file: ${localFile}` },
-            });
-          }
+          debugError(`sanitizeOriginal: cannot remove temporary file: ${localFile}`);
+          Raven.captureException(err, {
+            extra: { err: `sanitizeOriginal: cannot remove temporary file: ${localFile}` },
+          });
         }
       }
     }
