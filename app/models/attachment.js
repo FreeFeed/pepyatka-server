@@ -345,11 +345,11 @@ export function addModel(dbAdapter) {
         const filesToUpload = {};
 
         for (const [variant, info] of Object.entries(files)) {
-          if (this.previews.image[variant]) {
+          if (variant === '') {
+            // Skip the original
+          } else if (this.previews.image[variant]) {
             // This variant already exists, keep it as is
             mediaData.previews.image[variant] = this.previews.image[variant];
-          } else if (variant === '') {
-            // Skip the original
           } else {
             filesToUpload[variant] = info;
           }
