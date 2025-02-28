@@ -58,6 +58,12 @@ export function addModel(dbAdapter) {
 
       this.createdAt = params.createdAt;
       this.updatedAt = params.updatedAt;
+
+      /**
+       * This image attachment was created before the 'previews' field was
+       * introduced (i.e. before the v4 API).
+       */
+      this.isLegacyImage = this.mediaType === 'image' && this._previews === null;
     }
 
     get previews() {

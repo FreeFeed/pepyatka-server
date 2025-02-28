@@ -210,6 +210,7 @@ export class Attachment {
   updatedAt: Date;
   userId: UUID;
   postId: UUID | null;
+  isLegacyImage: boolean;
 
   constructor(params: AttachmentParams);
   static create(
