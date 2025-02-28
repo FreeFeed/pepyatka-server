@@ -319,6 +319,7 @@ describe('Attachments', () => {
         previews: expect.it('to equal', { image: { '': { h: 150, w: 150, ext: 'png' } } }),
         width: 150,
         height: 150,
+        isLegacyImage: true,
       });
     });
 
@@ -343,6 +344,7 @@ describe('Attachments', () => {
         }),
         width: 900,
         height: 300,
+        isLegacyImage: true,
       });
     });
 
@@ -369,6 +371,7 @@ describe('Attachments', () => {
         }),
         width: 1500,
         height: 1000,
+        isLegacyImage: true,
       });
     });
 
